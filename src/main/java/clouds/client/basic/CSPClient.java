@@ -75,8 +75,8 @@ public  class CSPClient {
 
 		MessageEnvelope messageEnvelope = new MessageEnvelope();
 
-		Message message = messageEnvelope.getMessage(csp.getCSPCloudNumber(),
-				true);
+		Message message = messageEnvelope.createMessage(csp.getCSPCloudNumber(),
+				0);
 		message.setToAuthority(XDI3Segment.fromComponent(XdiPeerRoot
 				.createPeerRootArcXri(RESPECT_NETWORK_CLOUD_NUMBER)));
 		message.setLinkContractXri(XDI3Segment.create("+registrar$do"));
@@ -125,8 +125,8 @@ public  class CSPClient {
 		
 		MessageEnvelope messageEnvelope = new MessageEnvelope();
 
-		Message message = messageEnvelope.getMessage(csp.getCSPCloudNumber(),
-				true);
+		Message message = messageEnvelope.createMessage(csp.getCSPCloudNumber(),
+				0);
 		message.setToAuthority(XDI3Segment.fromComponent(XdiPeerRoot
 				.createPeerRootArcXri(RESPECT_NETWORK_CLOUD_NUMBER)));
 		message.setLinkContractXri(XDI3Segment.create("+registrar$do"));
@@ -167,8 +167,8 @@ public  class CSPClient {
 
 		MessageEnvelope messageEnvelope = new MessageEnvelope();
 
-		Message message = messageEnvelope.getMessage(csp.getCSPCloudNumber(),
-				true);
+		Message message = messageEnvelope.createMessage(csp.getCSPCloudNumber(),
+				0);
 		message.setToAuthority(XDI3Segment.fromComponent(XdiPeerRoot
 				.createPeerRootArcXri(csp.getCSPCloudNumber())));
 		message.setLinkContractXri(XDI3Segment.create("$do"));
@@ -207,8 +207,8 @@ public  class CSPClient {
 
 		MessageEnvelope messageEnvelope = new MessageEnvelope();
 
-		Message message = messageEnvelope.getMessage(csp.getCSPCloudNumber(),
-				true);
+		Message message = messageEnvelope.createMessage(csp.getCSPCloudNumber(),
+				0);
 		message.setToAuthority(XDI3Segment.fromComponent(XdiPeerRoot
 				.createPeerRootArcXri(RESPECT_NETWORK_CLOUD_NUMBER)));
 		message.setLinkContractXri(XDI3Segment.create("+registrar$do"));

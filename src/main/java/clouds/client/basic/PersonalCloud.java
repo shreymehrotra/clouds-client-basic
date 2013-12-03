@@ -10,8 +10,6 @@ import java.util.Hashtable;
 import java.util.Iterator;
 import java.util.UUID;
 
-import com.ibm.icu.util.StringTokenizer;
-
 import xdi2.client.XDIClient;
 import xdi2.client.exceptions.Xdi2ClientException;
 import xdi2.client.http.XDIHttpClient;
@@ -19,15 +17,13 @@ import xdi2.core.ContextNode;
 import xdi2.core.Graph;
 import xdi2.core.Literal;
 import xdi2.core.Relation;
-import xdi2.core.constants.XDIAuthenticationConstants;
 import xdi2.core.exceptions.Xdi2ParseException;
-import xdi2.core.features.nodetypes.XdiAttributeSingleton;
 import xdi2.core.features.nodetypes.XdiPeerRoot;
-import xdi2.core.features.nodetypes.XdiValue;
 import xdi2.core.impl.json.memory.MemoryJSONGraphFactory;
 import xdi2.core.impl.memory.MemoryGraph;
 import xdi2.core.io.XDIWriterRegistry;
 import xdi2.core.util.iterators.ReadOnlyIterator;
+import xdi2.core.xri3.CloudNumber;
 import xdi2.core.xri3.XDI3Segment;
 import xdi2.core.xri3.XDI3Statement;
 import xdi2.core.xri3.XDI3SubSegment;
@@ -38,15 +34,17 @@ import xdi2.messaging.Message;
 import xdi2.messaging.MessageEnvelope;
 import xdi2.messaging.MessageResult;
 
+import com.ibm.icu.util.StringTokenizer;
+
 public class PersonalCloud {
 
 	public static XDI3Segment XRI_S_DEFAULT_LINKCONTRACT = XDI3Segment
 			.create("$do");
 
 	public static String DEFAULT_REGISTRY_URI = "http://mycloud.neustar.biz:12220/";
-	public static String WEBAPP_BASE_URI = "http://mycloud.neustar.biz:8080/myapp/personalclouds/";
 	// public static String WEBAPP_BASE_URI =
-	// "http://ACHOWDHU-LTW7.cis.neustar.com:8080/myapp/personalclouds/";
+	// "http://mycloud.neustar.biz:8080/myapp/personalclouds/";
+	public static String WEBAPP_BASE_URI = "http://ACHOWDHU-LTW7.cis.neustar.com:8085/personalclouds/";
 	private String secretToken = null;
 	private XDI3Segment linkContractAddress = null;
 
@@ -104,7 +102,8 @@ public class PersonalCloud {
 				return null;
 			}
 
-			pc.cloudNumber = discoveryResult.getCloudNumber();
+			CloudNumber cnum = discoveryResult.getCloudNumber();
+			pc.cloudNumber = cnum.getXri();
 			pc.cloudEndpointURI = discoveryResult.getXdiEndpointUri();
 
 		} catch (Xdi2ClientException e) {
@@ -136,7 +135,7 @@ public class PersonalCloud {
 		// } else {
 		// pc.sessionId = session;
 		// }
-		if(pc.getWholeGraph() == null){
+		if (pc.getWholeGraph() == null) {
 			return null;
 		}
 		return pc;
@@ -234,7 +233,7 @@ public class PersonalCloud {
 				return null;
 			}
 
-			pc.cloudNumber = discoveryResult.getCloudNumber();
+			pc.cloudNumber = discoveryResult.getCloudNumber().getXri();
 			pc.cloudEndpointURI = discoveryResult.getXdiEndpointUri();
 		} catch (Xdi2ClientException e) {
 			// TODO Auto-generated catch block
@@ -289,13 +288,13 @@ public class PersonalCloud {
 		// prepare message envelope for getting email
 
 		MessageEnvelope messageEnvelope = new MessageEnvelope();
-		Message message = messageEnvelope.getMessage(cloudNumber, true);
+		Message message = messageEnvelope.createMessage(cloudNumber, 0);
 		message.setLinkContractXri(linkContractAddress);
 		message.setSecretToken(secretToken);
 		message.setToAuthority(XDI3Segment.fromComponent(XdiPeerRoot
 				.createPeerRootArcXri(cloudNumber)));
 
-		message.createGetOperation(XDI3Segment.create("()"));
+		message.createGetOperation(XDI3Segment.create(""));
 
 		// System.out.println("Message :\n" + messageEnvelope + "\n");
 		try {
@@ -375,7 +374,7 @@ public class PersonalCloud {
 		// prepare message envelope
 
 		MessageEnvelope messageEnvelope = new MessageEnvelope();
-		Message message = messageEnvelope.getMessage(cloudNumber, true);
+		Message message = messageEnvelope.createMessage(cloudNumber, 0);
 		message.setLinkContractXri(linkContractAddress);
 
 		message.setSecretToken(secretToken);
@@ -440,7 +439,7 @@ public class PersonalCloud {
 		// prepare message envelope for getting email
 
 		MessageEnvelope messageEnvelope = new MessageEnvelope();
-		Message message = messageEnvelope.getMessage(senderCloudNumber, true);
+		Message message = messageEnvelope.createMessage(senderCloudNumber, 0);
 		message.setLinkContractXri(linkContractAddress);
 		if (secretToken != null) {
 			message.setSecretToken(secretToken);
@@ -490,7 +489,7 @@ public class PersonalCloud {
 		// prepare message envelope for getting phone
 
 		MessageEnvelope messageEnvelope2 = new MessageEnvelope();
-		Message message2 = messageEnvelope2.getMessage(senderCloudNumber, true);
+		Message message2 = messageEnvelope2.createMessage(senderCloudNumber, 0);
 		message2.setLinkContractXri(linkContractAddress);
 		if (secretToken != null) {
 			message2.setSecretToken(secretToken);
@@ -552,7 +551,7 @@ public class PersonalCloud {
 		// prepare message envelope
 
 		MessageEnvelope messageEnvelope = new MessageEnvelope();
-		Message message = messageEnvelope.getMessage(cloudNumber, true);
+		Message message = messageEnvelope.createMessage(cloudNumber, 0);
 		message.setLinkContractXri(linkContractAddress);
 		System.out.println("setXDIStmts 2");
 		if (secretToken != null) {
@@ -620,7 +619,7 @@ public class PersonalCloud {
 		// prepare message envelope
 
 		MessageEnvelope messageEnvelope = new MessageEnvelope();
-		Message message = messageEnvelope.getMessage(cloudNumber, true);
+		Message message = messageEnvelope.createMessage(cloudNumber, 0);
 		message.setLinkContractXri(linkContractAddress);
 
 		message.setSecretToken(secretToken);
@@ -676,7 +675,7 @@ public class PersonalCloud {
 		// prepare message envelope
 
 		MessageEnvelope messageEnvelope = new MessageEnvelope();
-		Message message = messageEnvelope.getMessage(cloudNumber, true);
+		Message message = messageEnvelope.createMessage(cloudNumber, 0);
 		message.setLinkContractXri(linkContractAddress);
 
 		message.setSecretToken(secretToken);
@@ -735,7 +734,7 @@ public class PersonalCloud {
 		// prepare message envelope
 
 		MessageEnvelope messageEnvelope = new MessageEnvelope();
-		Message message = messageEnvelope.getMessage(senderCloudNumber, true);
+		Message message = messageEnvelope.createMessage(senderCloudNumber, 0);
 		message.setLinkContractXri(linkContractAddress);
 		if (secretToken != null) {
 			message.setSecretToken(secretToken);
@@ -797,7 +796,7 @@ public class PersonalCloud {
 		// prepare message envelope
 
 		MessageEnvelope messageEnvelope = new MessageEnvelope();
-		Message message = messageEnvelope.getMessage(senderCloudNumber, true);
+		Message message = messageEnvelope.createMessage(senderCloudNumber, 0);
 		message.setLinkContractXri(linkContractAddress);
 		if (secretToken != null) {
 			message.setSecretToken(secretToken);
@@ -873,7 +872,7 @@ public class PersonalCloud {
 		// prepare message envelope
 
 		MessageEnvelope messageEnvelope = new MessageEnvelope();
-		Message message = messageEnvelope.getMessage(cloudNumber, true);
+		Message message = messageEnvelope.createMessage(cloudNumber, 0);
 		message.setLinkContractXri(linkContractAddress);
 
 		message.setSecretToken(secretToken);
@@ -914,7 +913,7 @@ public class PersonalCloud {
 		// prepare message envelope
 
 		MessageEnvelope messageEnvelope = new MessageEnvelope();
-		Message message = messageEnvelope.getMessage(senderCloudNumber, true);
+		Message message = messageEnvelope.createMessage(senderCloudNumber, 0);
 		message.setLinkContractXri(linkContractAddress);
 		if (secretToken != null) {
 			message.setSecretToken(secretToken);
@@ -973,7 +972,7 @@ public class PersonalCloud {
 		// prepare message envelope
 
 		MessageEnvelope messageEnvelope = new MessageEnvelope();
-		Message message = messageEnvelope.getMessage(senderCloudNumber, true);
+		Message message = messageEnvelope.createMessage(senderCloudNumber, 0);
 		message.setLinkContractXri(linkContractAddress);
 		if (secretToken != null) {
 			message.setSecretToken(secretToken);
@@ -1047,7 +1046,7 @@ public class PersonalCloud {
 		// prepare message envelope
 
 		MessageEnvelope messageEnvelope = new MessageEnvelope();
-		Message message = messageEnvelope.getMessage(cloudNumber, true);
+		Message message = messageEnvelope.createMessage(cloudNumber, 0);
 		message.setLinkContractXri(linkContractAddress);
 
 		message.setSecretToken(secretToken);
@@ -1133,7 +1132,7 @@ public class PersonalCloud {
 		// prepare message envelope for getting email
 
 		MessageEnvelope messageEnvelope = new MessageEnvelope();
-		Message message = messageEnvelope.getMessage(cloudNumber, true);
+		Message message = messageEnvelope.createMessage(cloudNumber, 0);
 		message.setLinkContractXri(linkContractAddress);
 		message.setSecretToken(secretToken);
 		message.setToAuthority(XDI3Segment.fromComponent(XdiPeerRoot
@@ -1189,7 +1188,7 @@ public class PersonalCloud {
 		// assignee
 
 		MessageEnvelope messageEnvelope = new MessageEnvelope();
-		Message message = messageEnvelope.getMessage(cloudNumber, true);
+		Message message = messageEnvelope.createMessage(cloudNumber, 0);
 		message.setLinkContractXri(linkContractAddress);
 		message.setSecretToken(secretToken);
 		message.setToAuthority(XDI3Segment.fromComponent(XdiPeerRoot
@@ -1244,7 +1243,7 @@ public class PersonalCloud {
 		// assignee
 
 		MessageEnvelope messageEnvelope = new MessageEnvelope();
-		Message message = messageEnvelope.getMessage(cloudNumber, true);
+		Message message = messageEnvelope.createMessage(cloudNumber, 0);
 		message.setLinkContractXri(linkContractAddress);
 		message.setSecretToken(secretToken);
 		message.setToAuthority(XDI3Segment.fromComponent(XdiPeerRoot
@@ -1295,7 +1294,7 @@ public class PersonalCloud {
 
 		XDIClient xdiClient = new XDIHttpClient(peerCloud.getCloudEndpointURI());
 		MessageEnvelope messageEnvelope = new MessageEnvelope();
-		Message message = messageEnvelope.getMessage(cloudNumber, true);
+		Message message = messageEnvelope.createMessage(cloudNumber, 0);
 		message.setLinkContractXri(XDI3Segment
 				.create("$public[+pendingrequest]$do"));
 
@@ -1367,7 +1366,7 @@ public class PersonalCloud {
 		// create a pending request entry in sender's graph
 		xdiClient = new XDIHttpClient(getCloudEndpointURI());
 		messageEnvelope = new MessageEnvelope();
-		message = messageEnvelope.getMessage(cloudNumber, true);
+		message = messageEnvelope.createMessage(cloudNumber, 0);
 		message.setLinkContractXri(linkContractAddress);
 		message.setSecretToken(secretToken);
 		message.setToAuthority(XDI3Segment.fromComponent(XdiPeerRoot
@@ -1434,7 +1433,7 @@ public class PersonalCloud {
 
 		xdiClient = new XDIHttpClient(getCloudEndpointURI());
 		messageEnvelope = new MessageEnvelope();
-		message = messageEnvelope.getMessage(cloudNumber, true);
+		message = messageEnvelope.createMessage(cloudNumber, 0);
 		message.setLinkContractXri(linkContractAddress);
 		message.setSecretToken(secretToken);
 		message.setToAuthority(XDI3Segment.fromComponent(XdiPeerRoot
@@ -1486,7 +1485,7 @@ public class PersonalCloud {
 		String from = "", to = "", from_rel = "", to_rel = "", operation = "", requested_object = "";
 		XDIClient xdiClient = new XDIHttpClient(cloudEndpointURI);
 		MessageEnvelope messageEnvelope = new MessageEnvelope();
-		Message message = messageEnvelope.getMessage(cloudNumber, true);
+		Message message = messageEnvelope.createMessage(cloudNumber, 0);
 		message.setLinkContractXri(linkContractAddress);
 		message.setSecretToken(secretToken);
 		message.setToAuthority(XDI3Segment.fromComponent(XdiPeerRoot
@@ -1567,7 +1566,7 @@ public class PersonalCloud {
 		// delete the request
 		xdiClient = new XDIHttpClient(cloudEndpointURI);
 		MessageEnvelope delMessageEnvelope = new MessageEnvelope();
-		Message delMessage = delMessageEnvelope.getMessage(cloudNumber, true);
+		Message delMessage = delMessageEnvelope.createMessage(cloudNumber, 0);
 		delMessage.setLinkContractXri(linkContractAddress);
 		delMessage.setSecretToken(secretToken);
 		delMessage.setToAuthority(XDI3Segment.fromComponent(XdiPeerRoot
@@ -1602,7 +1601,7 @@ public class PersonalCloud {
 
 		xdiClient = new XDIHttpClient(peerCloud.getCloudEndpointURI());
 		messageEnvelope = new MessageEnvelope();
-		message = messageEnvelope.getMessage(cloudNumber, true);
+		message = messageEnvelope.createMessage(cloudNumber, 0);
 		message.setLinkContractXri(XDI3Segment
 				.create("$public[+approvedrequest]$do"));
 
@@ -1671,7 +1670,7 @@ public class PersonalCloud {
 		xdiClient = new XDIHttpClient(peerCloud.getCloudEndpointURI());
 
 		messageEnvelope = new MessageEnvelope();
-		message = messageEnvelope.getMessage(cloudNumber, true);
+		message = messageEnvelope.createMessage(cloudNumber, 0);
 		message.setLinkContractXri(XDI3Segment
 				.create("$public[+pendingrequest]$do"));
 
@@ -1718,7 +1717,7 @@ public class PersonalCloud {
 		// delete the request
 		XDIClient xdiClient = new XDIHttpClient(cloudEndpointURI);
 		MessageEnvelope delMessageEnvelope = new MessageEnvelope();
-		Message delMessage = delMessageEnvelope.getMessage(cloudNumber, true);
+		Message delMessage = delMessageEnvelope.createMessage(cloudNumber, 0);
 		delMessage.setLinkContractXri(linkContractAddress);
 		delMessage.setSecretToken(secretToken);
 		delMessage.setToAuthority(XDI3Segment.fromComponent(XdiPeerRoot
@@ -1771,7 +1770,7 @@ public class PersonalCloud {
 	public void createDefaultLinkContracts() {
 		XDIClient xdiClient = new XDIHttpClient(cloudEndpointURI);
 		MessageEnvelope messageEnvelope = new MessageEnvelope();
-		Message message = messageEnvelope.getMessage(cloudNumber, true);
+		Message message = messageEnvelope.createMessage(cloudNumber, 0);
 		message.setLinkContractXri(linkContractAddress);
 		message.setSecretToken(secretToken);
 		message.setToAuthority(XDI3Segment.fromComponent(XdiPeerRoot
@@ -1870,7 +1869,7 @@ public class PersonalCloud {
 		// prepare message envelope for getting email
 
 		MessageEnvelope messageEnvelope = new MessageEnvelope();
-		Message message = messageEnvelope.getMessage(cloudNumber, true);
+		Message message = messageEnvelope.createMessage(cloudNumber, 0);
 		message.setLinkContractXri(linkContractAddress);
 		message.setSecretToken(secretToken);
 		message.setToAuthority(XDI3Segment.fromComponent(XdiPeerRoot
@@ -1929,7 +1928,7 @@ public class PersonalCloud {
 		// the target
 
 		MessageEnvelope messageEnvelope = new MessageEnvelope();
-		Message message = messageEnvelope.getMessage(cloudNumber, true);
+		Message message = messageEnvelope.createMessage(cloudNumber, 0);
 		message.setLinkContractXri(linkContractAddress);
 		message.setSecretToken(secretToken);
 		message.setToAuthority(XDI3Segment.fromComponent(XdiPeerRoot
@@ -1988,7 +1987,7 @@ public class PersonalCloud {
 		XDIClient xdiClient = new XDIHttpClient(peerCloud.getCloudEndpointURI());
 
 		MessageEnvelope messageEnvelope = new MessageEnvelope();
-		Message message = messageEnvelope.getMessage(cloudNumber, true);
+		Message message = messageEnvelope.createMessage(cloudNumber, 0);
 		message.setLinkContractXri(linkContract);
 
 		message.setToAuthority(XDI3Segment.fromComponent(XdiPeerRoot
@@ -2229,52 +2228,46 @@ public class PersonalCloud {
 			// prepare secret token input HTML
 
 			StringBuffer buf = new StringBuffer();
-/*
-			buf.append("<html><head></head><div id=\"authn_form\" style=\"position: relative; top: 61px; left: 64px; z-index: 1000;display: block;\">");
-			buf.append("<body>");
-			buf.append("<p>Hello : ");
-			buf.append(respondingPartyCloudName);
-			buf.append(", welcome to your Connect Service.</p>");
-			buf.append("<p>Please authenticate:</p>");
-			// buf.append("<form action=\"http://mycloud.neustar.biz:8080/myapp/personalclouds/");
-			buf.append("<form action=\"" + WEBAPP_BASE_URI);
-			buf.append(URLEncoder.encode(respondingPartyCloudNumber, "UTF-8"));
-			buf.append("/connect/authorize/\" method=\"post\">");
-			// buf.append("<input type=\"hidden\" name=\"lcTemplateAddress\" value=\"");
-			// buf.append(lcTemplateAddress);
-			// buf.append("\">");
-			// buf.append("</input>");
-			// buf.append("<input type=\"hidden\" name=\"relyingParty\" value=\"");
-			// buf.append(templateOwnerInumber);
-			// buf.append("\">");
-			// buf.append("</input>");
-			buf.append("<input type=\"hidden\" name=\"successurl\" value=\""
-					+ successurl + "\">");
-			buf.append("</input>");
-			buf.append("<input type=\"hidden\" name=\"failureurl\" value=\""
-					+ failureurl + "\">");
-			buf.append("</input>");
-			buf.append("<input type=\"hidden\" name=\"cloudname\" value=\""
-					+ respondingPartyCloudName + "\">");
-			buf.append("</input>");
-			buf.append("<input type=\"hidden\" name=\"relayState\" value=\""
-					+ relayState + "\">");
-			buf.append("</input>");
-			// buf.append("<input type=\"hidden\" name=\"connectRequest\" value=\"");
-			// buf.append(URLEncoder.encode(respectConnectRequest,"UTF-8"));
-			// buf.append("\">");
-			buf.append("<input type=\"hidden\" name=\"connectRequest\" value=\'");
-			buf.append(respectConnectRequest);
-			buf.append("\'>");
-
-			buf.append("</input>");
-			buf.append("Your Secret Token: <input type=\"password\" name=\"secrettoken\"/><br>");
-			buf.append("<input type=\"submit\" value=\"Authenticate!\"/>");
-			buf.append("</form>");
-			buf.append("</div>");
-			buf.append("</body>");
-			buf.append("</html>");
-*/
+			/*
+			 * buf.append(
+			 * "<html><head></head><div id=\"authn_form\" style=\"position: relative; top: 61px; left: 64px; z-index: 1000;display: block;\">"
+			 * ); buf.append("<body>"); buf.append("<p>Hello : ");
+			 * buf.append(respondingPartyCloudName);
+			 * buf.append(", welcome to your Connect Service.</p>");
+			 * buf.append("<p>Please authenticate:</p>"); // buf.append(
+			 * "<form action=\"http://mycloud.neustar.biz:8080/myapp/personalclouds/"
+			 * ); buf.append("<form action=\"" + WEBAPP_BASE_URI);
+			 * buf.append(URLEncoder.encode(respondingPartyCloudNumber,
+			 * "UTF-8")); buf.append("/connect/authorize/\" method=\"post\">");
+			 * // buf.append(
+			 * "<input type=\"hidden\" name=\"lcTemplateAddress\" value=\""); //
+			 * buf.append(lcTemplateAddress); // buf.append("\">"); //
+			 * buf.append("</input>"); //
+			 * buf.append("<input type=\"hidden\" name=\"relyingParty\" value=\""
+			 * ); // buf.append(templateOwnerInumber); // buf.append("\">"); //
+			 * buf.append("</input>");
+			 * buf.append("<input type=\"hidden\" name=\"successurl\" value=\""
+			 * + successurl + "\">"); buf.append("</input>");
+			 * buf.append("<input type=\"hidden\" name=\"failureurl\" value=\""
+			 * + failureurl + "\">"); buf.append("</input>");
+			 * buf.append("<input type=\"hidden\" name=\"cloudname\" value=\"" +
+			 * respondingPartyCloudName + "\">"); buf.append("</input>");
+			 * buf.append("<input type=\"hidden\" name=\"relayState\" value=\""
+			 * + relayState + "\">"); buf.append("</input>"); //
+			 * buf.append("<input type=\"hidden\" name=\"connectRequest\" value=\""
+			 * ); //
+			 * buf.append(URLEncoder.encode(respectConnectRequest,"UTF-8")); //
+			 * buf.append("\">");
+			 * buf.append("<input type=\"hidden\" name=\"connectRequest\" value=\'"
+			 * ); buf.append(respectConnectRequest); buf.append("\'>");
+			 * 
+			 * buf.append("</input>"); buf.append(
+			 * "Your Secret Token: <input type=\"password\" name=\"secrettoken\"/><br>"
+			 * );
+			 * buf.append("<input type=\"submit\" value=\"Authenticate!\"/>");
+			 * buf.append("</form>"); buf.append("</div>");
+			 * buf.append("</body>"); buf.append("</html>");
+			 */
 			buf.append("<html><head><title>Personal Cloud Login</title></head><body>");
 			buf.append("<div id='authn_form' style='position: relative; top: 61px; left: 64px; z-index: 1000;display: block; border:2px solid; border-radius:25px; width:400px;padding:10px; background-color:lightgrey;  margin:0 auto; '>");
 			buf.append("<div  style='border:2px solid; border-radius:25px;text-align:center; background-color:grey; color:white;' >Connection Manager - Login </div>");
@@ -2303,7 +2296,7 @@ public class PersonalCloud {
 			buf.append("</input>");
 			buf.append("Enter your password: <input type=\"password\" name=\"secrettoken\"/><br>");
 			buf.append(" <div style='text-align:center;position:relative;top:12px;'><input type=\"submit\" value=\"Login\"/>");
-			buf.append("&nbsp;&nbsp;<input type='button' value='Concel' ></div>");
+			buf.append("&nbsp;&nbsp;<input type='button' value='Cancel' ></div>");
 			buf.append("</form>");
 			buf.append("</body>");
 			buf.append("</div>");
@@ -2323,11 +2316,170 @@ public class PersonalCloud {
 
 	}
 
+	public boolean showApprovalForm2(String connectRequest,
+			String respondingPartyCloudNumberEncoded, String authToken , Hashtable<String, String> formParams, Hashtable<String, String> requestedFields) {
+		
+
+		String respondingPartyCloudNumber = null;
+		try {
+
+			respondingPartyCloudNumber = URLDecoder.decode(
+					respondingPartyCloudNumberEncoded, "UTF-8");
+		} catch (UnsupportedEncodingException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		//System.out.println("Connect Request :\n" + connectRequest);
+
+		System.out.println("respondingPartyCloudNumber : \n"
+				+ respondingPartyCloudNumber);
+
+		System.out.println("Auth Token : \n" + authToken);
+		this.secretToken = authToken;
+		this.linkContractAddress = PersonalCloud.XRI_S_DEFAULT_LINKCONTRACT;
+		this.cloudNumber = XDI3Segment.create(respondingPartyCloudNumber);
+		this.senderCloudNumber = XDI3Segment.create(respondingPartyCloudNumber);
+
+		MemoryJSONGraphFactory graphFactory = new MemoryJSONGraphFactory();
+		String templateOwnerInumber = null;
+		try {
+			Graph g = graphFactory.parseGraph(connectRequest);
+			// get remote cloud number
+
+			XDIWriterRegistry.forFormat("XDI DISPLAY", null).write(g,
+					System.out);
+			ContextNode c = g.getRootContextNode();
+			ReadOnlyIterator<ContextNode> allCNodes = c.getAllContextNodes();
+			for (ContextNode ci : allCNodes) {
+				if (ci.containsContextNode(XDI3SubSegment.create("[$msg]"))) {
+					templateOwnerInumber = ci.toString();
+					System.out.println(templateOwnerInumber);
+					break;
+				}
+			}
+			if (templateOwnerInumber == null) {
+				System.out
+						.println("No cloudnumber for requestor/template owner");
+				return false;
+			}
+			// get the address of the link contract template
+			// $set{$do}
+
+			String lcTemplateAddress = null;
+
+			ReadOnlyIterator<Relation> allRelations = c.getAllRelations(); 
+			for (Relation r : allRelations) {
+				if (r.getArcXri().toString().equals("$set{$do}")) {
+					lcTemplateAddress = r.getTargetContextNodeXri().toString();
+					System.out.println(r.getTargetContextNodeXri());
+				}
+
+			}
+			if (lcTemplateAddress == null) {
+				System.out.println("No LC template address provided");
+				return false;
+			}
+			String meta_link_contract = "{$to}" + templateOwnerInumber
+					+ "{$from}" + templateOwnerInumber + "+registration$do";
+
+			PersonalCloud remoteCloud = PersonalCloud.open(
+					XDI3Segment.create(templateOwnerInumber), this.cloudNumber,
+					XDI3Segment.create("$public$do"), "");
+			ArrayList<XDI3Segment> querySegments = new ArrayList<XDI3Segment>();
+			querySegments.add(XDI3Segment.create(templateOwnerInumber
+					+ "<+name>"));
+
+			querySegments.add(XDI3Segment.create(lcTemplateAddress));
+
+			ArrayList<XDI3Statement> queryStmts = new ArrayList<XDI3Statement>();
+			queryStmts.add(XDI3Statement.create(templateOwnerInumber
+					+ "/$is$ref/{}"));
+			MessageResult responseFromRemoteCloud = null;
+
+			try {
+				responseFromRemoteCloud = remoteCloud.sendQueries(
+						querySegments, queryStmts, false);
+			} catch (Exception ex) {
+				return false;
+			}
+			if (responseFromRemoteCloud == null) {
+				return false;
+			}
+
+			Graph responseGraph = responseFromRemoteCloud.getGraph();
+			ContextNode responseRootContext = responseGraph
+					.getRootContextNode();
+
+			ArrayList<XDI3Segment> getDataFields = new ArrayList<XDI3Segment>();
+
+			ReadOnlyIterator<Relation> getRelations = responseRootContext
+					.getAllRelations();
+			for (Relation r : getRelations) {
+				if (r.getArcXri().toString().equals("$get")) {
+
+					getDataFields.add(r.getTargetContextNodeXri());
+					//System.out.println(r.getTargetContextNodeXri());
+
+				}
+
+			}
+
+			Literal requestingPartyNameLit = responseRootContext
+					.getDeepLiteral(XDI3Segment.create(templateOwnerInumber
+							+ "<+name>&"));
+			Relation requestingPartyCloudnameRel = responseRootContext
+					.getDeepRelation(XDI3Segment.create(templateOwnerInumber),
+							XDI3Segment.create("$is$ref"));
+			String requestingPartyCloudName = requestingPartyCloudnameRel
+					.getTargetContextNodeXri().toString();
+
+			querySegments = new ArrayList<XDI3Segment>();
+			queryStmts = new ArrayList<XDI3Statement>();
+			for (XDI3Segment dataField : getDataFields) {
+				String dataFieldStr = dataField.toString();
+				if (!dataFieldStr.contains("$is$ref")) {
+					dataFieldStr = dataFieldStr.replace("{$to}",
+							respondingPartyCloudNumber);
+
+					querySegments.add(XDI3Segment.create(dataFieldStr));
+				}
+			}
+			MessageResult responseFromThisCloud = this.sendQueries(
+					querySegments, queryStmts, false);
+
+			Graph responseGraph3 = responseFromThisCloud.getGraph();
+			ContextNode responseRootContext3 = responseGraph3
+					.getRootContextNode();
+			ReadOnlyIterator<Literal> allLiteralsFromResponse = responseRootContext3
+					.getAllLiterals();
+
+			for (Literal lit : allLiteralsFromResponse) {
+
+				requestedFields.put(lit.getContextNode().toString(),
+						lit.getLiteralDataString());
+
+			}
+			formParams.put("linkContractTemplateAddress", lcTemplateAddress);
+			formParams.put("requestingPartyCloudNumber", templateOwnerInumber);
+			formParams.put("requestingPartyCloudName", requestingPartyCloudName);
+		} catch (Xdi2ParseException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return false;
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+			return false;
+		}
+
+		return true;
+	}
+
 	public String showApprovalForm(String connectRequestEncoded,
 			String respondingPartyCloudNumberEncoded, String authToken,
 			String successurl, String failureurl, String cloudname,
 			String relayState) {
-		String result = null;
+		String result = "<html><body>Aw snap ! The request did not go through ... Better luck next time !</body> </html>";
 
 		String connectRequest = null, respondingPartyCloudNumber = null;
 		try {
@@ -2404,14 +2556,21 @@ public class PersonalCloud {
 			ArrayList<XDI3Statement> queryStmts = new ArrayList<XDI3Statement>();
 			queryStmts.add(XDI3Statement.create(templateOwnerInumber
 					+ "/$is$ref/{}"));
-			MessageResult responseFromRemoteCloud = remoteCloud.sendQueries(
-					querySegments, queryStmts, false);
+			MessageResult responseFromRemoteCloud = null;
+
+			try {
+				responseFromRemoteCloud = remoteCloud.sendQueries(
+						querySegments, queryStmts, false);
+			} catch (Exception ex) {
+				return result;
+			}
+			if (responseFromRemoteCloud == null) {
+				return result;
+			}
 
 			Graph responseGraph = responseFromRemoteCloud.getGraph();
 			ContextNode responseRootContext = responseGraph
 					.getRootContextNode();
-
-			
 
 			ArrayList<XDI3Segment> getDataFields = new ArrayList<XDI3Segment>();
 
@@ -2419,10 +2578,10 @@ public class PersonalCloud {
 					.getAllRelations();
 			for (Relation r : getRelations) {
 				if (r.getArcXri().toString().equals("$get")) {
-					
-						getDataFields.add(r.getTargetContextNodeXri());
-						System.out.println(r.getTargetContextNodeXri());
-					
+
+					getDataFields.add(r.getTargetContextNodeXri());
+					System.out.println(r.getTargetContextNodeXri());
+
 				}
 
 			}
@@ -2460,22 +2619,127 @@ public class PersonalCloud {
 
 			StringBuffer buf = new StringBuffer();
 			/*
+			 * buf.append("<html><head>");
+			 * 
+			 * buf.append("<SCRIPT LANGUAGE=\"JavaScript\">"); buf.append(
+			 * "function buttonClick(val){ document.getElementById('buttonClicked').value = val; return true; }"
+			 * ); buf.append("</SCRIPT></head>"); buf.append("<body>");
+			 * buf.append(
+			 * "<div id=\"authz_form\" style=\"position: relative; top: 61px; left: 64px; z-index: 1000;display: block;\"><p>Link Contract Authorization Form</p>"
+			 * ); buf.append("<p>");
+			 * buf.append(requestingPartyNameLit.getLiteralDataString() +
+			 * "(Cloud Name: " + requestingPartyCloudNumberCtx +
+			 * ") is offering to connect to your Cloud via Respect Connect.</p>"
+			 * ); buf.append("<p>Please approve the link contract:</p>");
+			 * buf.append("<form action=\"" + WEBAPP_BASE_URI);
+			 * buf.append(URLEncoder.encode(respondingPartyCloudNumber,
+			 * "UTF-8")); buf.append("/connect/approve/\" method=\"post\">");
+			 * 
+			 * for (Literal lit : allLiteralsFromResponse) { String str = new
+			 * String("<input type=\"checkbox\" name=\"") + "fieldchoices" +
+			 * "\""; str += " value=\'"; // str +=
+			 * URLEncoder.encode(lit.getLiteralDataString(),"UTF-8"); str +=
+			 * lit.getContextNode().toString() + "|" +
+			 * lit.getLiteralDataString(); str += "\'>"; str +=
+			 * lit.getLiteralDataString(); str += "</input>"; buf.append(str); }
+			 * buf.append(
+			 * "<input type=\"hidden\" name=\"buttonClicked\" id=\"buttonClicked\"  /> <br>"
+			 * );
+			 * buf.append("<input type=\"hidden\" name=\"authToken\" value=\"");
+			 * buf.append(authToken); buf.append("\">"); buf.append("</input>");
+			 * buf.append(
+			 * "<input type=\"hidden\" name=\"linkContractTemplateAddress\" value=\'"
+			 * ); buf.append(lcTemplateAddress); buf.append("\'>"); buf.append(
+			 * "<input type=\"hidden\" name=\"relyingPartyCloudNumber\" value=\'"
+			 * ); buf.append(templateOwnerInumber); buf.append("\'>");
+			 * buf.append("<input type=\"hidden\" name=\"successurl\" value=\""
+			 * + successurl + "\">"); buf.append("</input>");
+			 * buf.append("<input type=\"hidden\" name=\"failureurl\" value=\""
+			 * + failureurl + "\">"); buf.append("</input>");
+			 * buf.append("<input type=\"hidden\" name=\"cloudname\" value=\"" +
+			 * cloudname + "\">"); buf.append("</input>");
+			 * buf.append("<input type=\"hidden\" name=\"relayState\" value=\""
+			 * + relayState + "\">"); buf.append("</input>");
+			 * buf.append("<input type=\"hidden\" name=\"connectRequest\" value=\'"
+			 * ); buf.append(connectRequest); buf.append("\'>"); buf.append(
+			 * "<input type=\"submit\" value=\"Approve!\" onclick=\"return buttonClick('Approve')\" />"
+			 * ); buf.append(
+			 * "<input type=\"submit\" value=\"Reject!\" onclick=\"return buttonClick('Reject')\" />"
+			 * ); buf.append("</form>"); buf.append("</div>");
+			 * buf.append("</body>"); buf.append("</html>");
+			 */
 			buf.append("<html><head>");
 
 			buf.append("<SCRIPT LANGUAGE=\"JavaScript\">");
 			buf.append("function buttonClick(val){ document.getElementById('buttonClicked').value = val; return true; }");
 			buf.append("</SCRIPT></head>");
 			buf.append("<body>");
-			buf.append("<div id=\"authz_form\" style=\"position: relative; top: 61px; left: 64px; z-index: 1000;display: block;\"><p>Link Contract Authorization Form</p>");
-			buf.append("<p>");
-			buf.append(requestingPartyNameLit.getLiteralDataString()
-					+ "(Cloud Name: "
-					+ requestingPartyCloudNumberCtx
-					+ ") is offering to connect to your Cloud via Respect Connect.</p>");
-			buf.append("<p>Please approve the link contract:</p>");
+
+			// start the outer div
+			buf.append("<div id=\"authz_form\" style='position: relative; top: 61px; z-index: 1000;display: block; border:2px solid; border-radius:25px; width:600px;height:382px;padding:10px; background-color:lightgrey;  margin:0 auto; overflow: hidden;'>");
+			buf.append("<div  style='border:2px solid; border-radius:25px 25px 0px 0px ;text-align:center; background-color:grey; color:white;' >Connection Manager - Authorization </div>");
+
+			// *start the white inner box
+			buf.append("<div style='background-color:white;position:relative;top:10px;padding:10px;overflow: hidden;height:325px;border-radius: 0px 0px 25px 25px;'>");
+
+			// **start the requester corner
+			buf.append("<div style='position: relative;top: 15px;left: 10px;height: 70px;width: 285px;' >");
+
+			// fake the requesting corner
+			if (requestingPartyCloudNumberCtx.equalsIgnoreCase("@acmebread")) {
+
+				buf.append("<div style='position: relative;top: -10px;left: 10px;height: 70px;width: 285px;' >");
+				buf.append("<img src='http://acme.respectnetwork.net/acmedemo/acme-logo.png' alt='' />	<br />");
+				buf.append("<div style='text-align: right;width: 240px;'> Member since: <b>March 2013</b> </div>");
+
+			} else {
+				buf.append(requestingPartyNameLit.getLiteralDataString()
+						+ "(Cloud Name: "
+						+ requestingPartyCloudNumberCtx
+						+ ") is offering to connect to your Cloud via Respect Connect.");
+
+			}
+
+			buf.append("</div>	");
+			// **end the requester corner
+
+			// **start the reputation corner
+
+			// put in the top right 'reputation' area
+			buf.append("<div name='reputationBlock'  style='position:relative; top:-64px;left:330px'>");
+			buf.append("<div style='position:relative; top:0px;left:0px' >");
+			buf.append("<div style='position:relative; top:0px;left:0px;color:#336699;font-size:14pt; font-weight:bold;text-align:center;width:131px;' >Respect</div>");
+			buf.append("<div style='position:relative; top:0px;left:0px;color:#ff6633;font-size:14pt; font-weight:bold;text-align:center;width:131px;'>Connections</div>");
+			buf.append("</div>");
+			buf.append("<div style='position:relative; top:-45px;left:133px;font-size:14pt; font-weight:bold;text-align:center;height:40px;width:75px;border:3px solid; border-radius:25px;vertical-align: middle;display:table-cell;'>304</div>");
+			buf.append("</div>");
+			// **end the reputation corner
+
+			// start the form
 			buf.append("<form action=\"" + WEBAPP_BASE_URI);
 			buf.append(URLEncoder.encode(respondingPartyCloudNumber, "UTF-8"));
 			buf.append("/connect/approve/\" method=\"post\">");
+
+			// start bottom left authZ form
+
+			buf.append("<div name='dataAuth' style='border:0px solid;position:relative;top:-75px;left:15px;width:300px'>");
+			buf.append("<div>Personal data requested: </div>");
+
+			// start data list
+			buf.append(" <div style='border:0px solid;position:relative;top:10px;left:10px;width:250px'>");
+
+			buf.append("<table>");
+			buf.append("<tr>");
+
+			buf.append("<td>");
+
+			buf.append("Display Name:");
+
+			buf.append("</td>");
+			buf.append("<td>");
+
+			String val = "";
+			String name = "";
 
 			for (Literal lit : allLiteralsFromResponse) {
 				String str = new String("<input type=\"checkbox\" name=\"")
@@ -2489,180 +2753,52 @@ public class PersonalCloud {
 				str += "</input>";
 				buf.append(str);
 			}
-			buf.append("<input type=\"hidden\" name=\"buttonClicked\" id=\"buttonClicked\"  /> <br>");
-			buf.append("<input type=\"hidden\" name=\"authToken\" value=\"");
-			buf.append(authToken);
-			buf.append("\">");
-			buf.append("</input>");
-			buf.append("<input type=\"hidden\" name=\"linkContractTemplateAddress\" value=\'");
-			buf.append(lcTemplateAddress);
-			buf.append("\'>");
-			buf.append("<input type=\"hidden\" name=\"relyingPartyCloudNumber\" value=\'");
-			buf.append(templateOwnerInumber);
-			buf.append("\'>");
-			buf.append("<input type=\"hidden\" name=\"successurl\" value=\""
-					+ successurl + "\">");
-			buf.append("</input>");
-			buf.append("<input type=\"hidden\" name=\"failureurl\" value=\""
-					+ failureurl + "\">");
-			buf.append("</input>");
-			buf.append("<input type=\"hidden\" name=\"cloudname\" value=\""
-					+ cloudname + "\">");
-			buf.append("</input>");
-			buf.append("<input type=\"hidden\" name=\"relayState\" value=\""
-					+ relayState + "\">");
-			buf.append("</input>");
-			buf.append("<input type=\"hidden\" name=\"connectRequest\" value=\'");
-			buf.append(connectRequest);
-			buf.append("\'>");
-			buf.append("<input type=\"submit\" value=\"Approve!\" onclick=\"return buttonClick('Approve')\" />");
-			buf.append("<input type=\"submit\" value=\"Reject!\" onclick=\"return buttonClick('Reject')\" />");
-			buf.append("</form>");
-			buf.append("</div>");
-			buf.append("</body>");
-			buf.append("</html>");
-*/
-			buf.append("<html><head>");
 
-			buf.append("<SCRIPT LANGUAGE=\"JavaScript\">");
-			buf.append("function buttonClick(val){ document.getElementById('buttonClicked').value = val; return true; }");
-			buf.append("</SCRIPT></head>");
-			buf.append("<body>");
-			
-			// start the outer div
-			buf.append("<div id=\"authz_form\" style='position: relative; top: 61px; z-index: 1000;display: block; border:2px solid; border-radius:25px; width:600px;height:382px;padding:10px; background-color:lightgrey;  margin:0 auto; overflow: hidden;'>");
-			buf.append("<div  style='border:2px solid; border-radius:25px 25px 0px 0px ;text-align:center; background-color:grey; color:white;' >Connection Manager - Authorization </div>");
-			
-			// *start the white inner box
-			buf.append("<div style='background-color:white;position:relative;top:10px;padding:10px;overflow: hidden;height:325px;border-radius: 0px 0px 25px 25px;'>");
-			
-			//**start the requester corner
-			buf.append("<div style='position: relative;top: 15px;left: 10px;height: 70px;width: 285px;' >");
-			
-			// fake the requesting corner 
-			if(requestingPartyCloudNumberCtx.equalsIgnoreCase("@acmebread"))
-			{
-				
-				buf.append("<div style='position: relative;top: -10px;left: 10px;height: 70px;width: 285px;' >");
-				buf.append("<img src='http://acme.respectnetwork.net/acmedemo/acme-logo.png' alt='' />	<br />");
-				buf.append("<div style='text-align: right;width: 240px;'> Member since: <b>March 2013</b> </div>");
-				
-			} else
-			{
-				buf.append(requestingPartyNameLit.getLiteralDataString()
-						+ "(Cloud Name: "
-						+ requestingPartyCloudNumberCtx
-						+ ") is offering to connect to your Cloud via Respect Connect.");
-				
-			}
-			
-			buf.append("</div>	");
-			//**end the requester corner
-
-			//**start the reputation corner
-			
-			// put in the top right 'reputation' area
-			buf.append("<div name='reputationBlock'  style='position:relative; top:-64px;left:330px'>");
-			buf.append("<div style='position:relative; top:0px;left:0px' >");
-			buf.append("<div style='position:relative; top:0px;left:0px;color:#336699;font-size:14pt; font-weight:bold;text-align:center;width:131px;' >Respect</div>");
-			buf.append("<div style='position:relative; top:0px;left:0px;color:#ff6633;font-size:14pt; font-weight:bold;text-align:center;width:131px;'>Connections</div>");
-			buf.append("</div>");
-			buf.append("<div style='position:relative; top:-45px;left:133px;font-size:14pt; font-weight:bold;text-align:center;height:40px;width:75px;border:3px solid; border-radius:25px;vertical-align: middle;display:table-cell;'>304</div>");
-			buf.append("</div>");
-			//**end the reputation corner
-			
-			
-			// start the form
-			buf.append("<form action=\"" + WEBAPP_BASE_URI);
-			buf.append(URLEncoder.encode(respondingPartyCloudNumber, "UTF-8"));
-			buf.append("/connect/approve/\" method=\"post\">");
-			
-			
-			// start bottom left authZ form 
-			
-			buf.append("<div name='dataAuth' style='border:0px solid;position:relative;top:-75px;left:15px;width:300px'>");
-			buf.append("<div>Personal data requested: </div>");
-			
-			//start data list
-			buf.append(" <div style='border:0px solid;position:relative;top:10px;left:10px;width:250px'>");
-			
-			buf.append("<table>");
-			buf.append("<tr>");
-			
-			buf.append("<td>");
-			
-			buf.append("Display Name:");
-			
-			buf.append("</td>");
-			buf.append("<td>");
-			
-			
-			
-		        String val="";
-		        String name="";
-		       
-		        for (Literal lit : allLiteralsFromResponse) {
-                    String str = new String("<input type=\"checkbox\" name=\"")
-                                    + "fieldchoices" + "\"";
-                    str += " value=\'";
-                    // str += URLEncoder.encode(lit.getLiteralDataString(),"UTF-8");
-                    str += lit.getContextNode().toString() + "|"
-                                    + lit.getLiteralDataString();
-                    str += "\'>";
-                    str += lit.getLiteralDataString();
-                    str += "</input>";
-                   // buf.append(str);
-            }
-			
 			buf.append("<select>");
 			buf.append("<option value='");
-		
-			
-			buf.append(val+"'>");
-					
-					
-					
-			buf.append(name+"</option>");
-			
+
+			buf.append(val + "'>");
+
+			buf.append(name + "</option>");
+
 			buf.append("</select>");
 			buf.append("</td>");
-			
+
 			buf.append("</tr>");
 			buf.append("<tr>");
-			
+
 			buf.append("<td>");
-			
-			buf.append("Email:"); 
-			buf.append("</td>");
-			buf.append("<td>");    
-			buf.append("<select>");
-			buf.append("<option value='volvo'>email@domain.com</option>");
-			buf.append("<option value='saab'>myname@gmail.com</option>");
-			buf.append("<option value='mercedes'>something@yahoo.com</option>");
-			buf.append("</select>");
-			
-			
-			buf.append("</td>");
-			buf.append("</tr>");
-			buf.append("<tr>");
-			
-			buf.append("<td>");
-			buf.append("Zip Code:"); 
+
+			buf.append("Email:");
 			buf.append("</td>");
 			buf.append("<td>");
 			buf.append("<select>");
-			buf.append("<option value='volvo'>95120</option>");
-			buf.append("<option value='saab'>94702</option>");
+			buf.append("<option value='email@domain.com'>email@domain.com</option>");
+			buf.append("<option value='myname@gmail.com'>myname@gmail.com</option>");
+			buf.append("<option value='something@yahoo.com'>something@yahoo.com</option>");
 			buf.append("</select>");
-			
+
 			buf.append("</td>");
 			buf.append("</tr>");
-			
+			buf.append("<tr>");
+
+			buf.append("<td>");
+			buf.append("Zip Code:");
+			buf.append("</td>");
+			buf.append("<td>");
+			buf.append("<select>");
+			buf.append("<option value='95120'>95120</option>");
+			buf.append("<option value='94702'>94702</option>");
+			buf.append("</select>");
+
+			buf.append("</td>");
+			buf.append("</tr>");
+
 			buf.append("</table>");
-			
-			//end data list
+
+			// end data list
 			buf.append("<div>");
-			
+
 			buf.append("<input type=\"hidden\" name=\"buttonClicked\" id=\"buttonClicked\"  /> <br>");
 			buf.append("<input type=\"hidden\" name=\"authToken\" value=\"");
 			buf.append(authToken);
@@ -2689,42 +2825,41 @@ public class PersonalCloud {
 			buf.append("<input type=\"hidden\" name=\"connectRequest\" value=\'");
 			buf.append(connectRequest);
 			buf.append("\'>");
-			
+
 			// end bottom left authZ form
 			buf.append("</div >");
-		
-			//start right permisions form
+
+			// start right permisions form
 			buf.append("<div style='border:0px solid;position:relative;top:-140px;left:283px;width:250px'>");
-			
+
 			buf.append("Permissions requested:<br>");
-			
+
 			buf.append("<div style='padding:6px'>");
 			buf.append("<div style='padding:3px'>");
 			buf.append("<input type='checkbox'> Send daily news summary");
 			buf.append("</div>");
 			buf.append("<div style='padding:3px'>");
 			buf.append("<input type='checkbox'> Send weekly news summary");
-			
+
 			buf.append("</div>");
 			buf.append("</div>");
-			//end right permisions form
+			// end right permisions form
 			buf.append("</div>");
-			
-			//start bottom bottom button bar
+
+			// start bottom bottom button bar
 			buf.append("<div style='text-align:center;width:500px; position:relative;top:-75px;'>");
-						
+
 			buf.append("<input type=\"submit\" value=\"Approve!\" onclick=\"return buttonClick('Approve')\" />");
 			buf.append("<input type=\"submit\" value=\"Reject!\" onclick=\"return buttonClick('Reject')\" />");
-			
-			//end bottom bottom button bar
+
+			// end bottom bottom button bar
 			buf.append("</div>");
-			
-			
+
 			buf.append("</form>");
-			
+
 			// start the inner white div
 			buf.append("</div>");
-			
+
 			// end the outer div
 			buf.append("</div>");
 			buf.append("</body>");
@@ -2790,7 +2925,7 @@ public class PersonalCloud {
 
 		String xdiResponseValues = new String();
 
-		for (int i = 0; i < selectedValues.length; i++) {
+		for (int i = 0; (selectedValues != null) && (i < selectedValues.length); i++) {
 			String value = selectedValues[i];
 			StringTokenizer st = new StringTokenizer(value, "|");
 			String addressPart = st.nextToken();
