@@ -2878,6 +2878,106 @@ public class PersonalCloud {
 		return result;
 	}
 
+	public String processApprovalForm2(String linkContractTemplateAddress,
+			String relyingPartyCloudNumber, String respondingPartyCloudNumber,
+			String secrettoken, String[] selectedValues) {
+		String xdiResponseValues = new String();
+	
+		ArrayList<XDI3Statement> setStatements = new ArrayList<XDI3Statement>();
+		String isPlusstmt = new String();
+		isPlusstmt += respondingPartyCloudNumber;
+		isPlusstmt += "$to";
+		isPlusstmt += relyingPartyCloudNumber;
+		isPlusstmt += "$from";
+		isPlusstmt += relyingPartyCloudNumber;
+		isPlusstmt += "+registration$do/$is+/";
+		isPlusstmt += linkContractTemplateAddress;
+
+		setStatements.add(XDI3Statement.create(isPlusstmt));
+
+		String policyStmt = new String();
+		policyStmt += respondingPartyCloudNumber;
+		policyStmt += "$to";
+		policyStmt += relyingPartyCloudNumber;
+		policyStmt += "$from";
+		policyStmt += relyingPartyCloudNumber;
+		policyStmt += "+registration$do$if$and/$true/({$from}/$is/"
+				+ relyingPartyCloudNumber + ")";
+		setStatements.add(XDI3Statement.create(policyStmt));
+
+		policyStmt = new String();
+		policyStmt += respondingPartyCloudNumber;
+		policyStmt += "$to";
+		policyStmt += relyingPartyCloudNumber;
+		policyStmt += "$from";
+		policyStmt += relyingPartyCloudNumber;
+		policyStmt += "+registration$do$if$and/$true/({$msg}<$sig><$valid>&/&/true)";
+		setStatements.add(XDI3Statement.create(policyStmt));
+
+
+
+		for (int i = 0; (selectedValues != null) && (i < selectedValues.length); i++) {
+			String value = selectedValues[i];
+			StringTokenizer st = new StringTokenizer(value, "|");
+			String addressPart = st.nextToken();
+			String valuePart = st.nextToken();
+			xdiResponseValues += addressPart + "/&/" + "\"" + valuePart + "\""
+					+ "\n";
+			// strip the last & off
+			addressPart = addressPart.substring(0, addressPart.length() - 1);
+			String stmt = new String();
+			stmt += respondingPartyCloudNumber;
+			stmt += "$to";
+			stmt += relyingPartyCloudNumber;
+			stmt += "$from";
+			stmt += relyingPartyCloudNumber;
+			stmt += "+registration$do/$get/";
+			stmt += addressPart;
+
+			System.out.println("Set statements :" + stmt);
+			setStatements.add(XDI3Statement.create(stmt));
+		}
+		System.out.println("All Set statements :" + setStatements);
+		MessageResult setResponse = this.setXDIStmts(setStatements);
+		System.out.println("Set response : " + setResponse);
+
+		String targetSegment = new String();
+		targetSegment += respondingPartyCloudNumber;
+		targetSegment += "$to";
+		targetSegment += relyingPartyCloudNumber;
+		targetSegment += "$from";
+		targetSegment += relyingPartyCloudNumber;
+		targetSegment += "+registration$do";
+
+		xdiResponseValues += targetSegment + "/$is+/"
+				+ linkContractTemplateAddress + "\n";
+
+		// send link contract to the relying party
+		// {$from}[@]!:uuid:1+registration$do
+		// String lcAddress = "{$to}" + relyingPartyCloudNumber + "{$from}"
+		// + relyingPartyCloudNumber + "+registration$do";
+		// get cloudname
+		ArrayList<XDI3Statement> queryStmts = new ArrayList<XDI3Statement>();
+		queryStmts.add(XDI3Statement.create(this.cloudNumber + "/$is$ref/{}"));
+
+		MessageResult cloudNameResp = this.sendQueries(null, queryStmts, false);
+		ContextNode responseRootContext = cloudNameResp.getGraph()
+				.getRootContextNode();
+		if (responseRootContext != null) {
+			Relation requestingPartyCloudnameRel = responseRootContext
+					.getDeepRelation(this.cloudNumber,
+							XDI3Segment.create("$is$ref"));
+			if (requestingPartyCloudnameRel != null) {
+				String requestingPartyCloudNumberCtx = requestingPartyCloudnameRel
+						.getTargetContextNodeXri().toString();
+				xdiResponseValues += this.cloudNumber + "/$is$ref/"
+						+ requestingPartyCloudNumberCtx + "";
+			}
+		}
+		
+	
+		return xdiResponseValues;
+	}
 	public String processApprovalForm(String linkContractTemplateAddress,
 			String relyingPartyCloudNumber, String respondingPartyCloudNumber,
 			String secrettoken, String[] selectedValues, String successurl,
@@ -2946,9 +3046,9 @@ public class PersonalCloud {
 			System.out.println("Set statements :" + stmt);
 			setStatements.add(XDI3Statement.create(stmt));
 		}
-		System.out.println("All Set statements :" + setStatements);
+		//System.out.println("All Set statements :" + setStatements);
 		MessageResult setResponse = this.setXDIStmts(setStatements);
-		System.out.println("Set response : " + setResponse);
+		//System.out.println("Set response : " + setResponse);
 
 		String targetSegment = new String();
 		targetSegment += respondingPartyCloudNumber;
