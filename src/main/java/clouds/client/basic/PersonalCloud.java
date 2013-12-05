@@ -89,13 +89,11 @@ public class PersonalCloud {
 		XDIDiscoveryClient discovery = new XDIDiscoveryClient();
 		discovery.setRegistryXdiClient(httpClient);
 		try {
-			ArrayList<XDI3Segment> endpointUriTypes = new ArrayList<XDI3Segment>();
-			endpointUriTypes.add(XDI3Segment.create("$xdi"));
+			//ArrayList<XDI3Segment> endpointUriTypes = new ArrayList<XDI3Segment>();
+			//endpointUriTypes.add(XDI3Segment.create("<$xdi>"));
 			XDIDiscoveryResult discoveryResult = discovery
 					.discoverFromRegistry(cloudNameOrCloudNumber,
-							endpointUriTypes
-									.toArray(new XDI3Segment[endpointUriTypes
-											.size()]));
+							null);
 			// if the cloudName or cloudNumber is not registered in the
 			// Registry, then return null
 			if (discoveryResult.getCloudNumber() == null) {
@@ -220,13 +218,10 @@ public class PersonalCloud {
 
 		discovery.setRegistryXdiClient(httpClient);
 		try {
-			ArrayList<XDI3Segment> endpointUriTypes = new ArrayList<XDI3Segment>();
-			endpointUriTypes.add(XDI3Segment.create("$xdi"));
+			
 			XDIDiscoveryResult discoveryResult = discovery
 					.discoverFromRegistry(cloudNameOrCloudNumber,
-							endpointUriTypes
-									.toArray(new XDI3Segment[endpointUriTypes
-											.size()]));
+							null);
 			// if the cloudName or cloudNumber is not registered in the
 			// Registry, then return null
 			if (discoveryResult.getCloudNumber() == null) {
@@ -263,11 +258,9 @@ public class PersonalCloud {
 		XDIDiscoveryClient discovery = new XDIDiscoveryClient();
 		discovery.setRegistryXdiClient(httpClient);
 		try {
-			ArrayList<XDI3Segment> endpointUriTypes = new ArrayList<XDI3Segment>();
-			endpointUriTypes.add(XDI3Segment.create("$xdi"));
+			
 			discoveryResult = discovery.discoverFromRegistry(XDI3Segment
-					.create(cloudName), endpointUriTypes
-					.toArray(new XDI3Segment[endpointUriTypes.size()]));
+					.create(cloudName), null);
 
 		} catch (Xdi2ClientException e) {
 			// TODO Auto-generated catch block
