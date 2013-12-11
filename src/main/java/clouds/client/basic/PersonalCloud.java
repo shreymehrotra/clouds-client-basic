@@ -1,14 +1,27 @@
 package clouds.client.basic;
 
 import java.io.IOException;
+import java.io.StringReader;
+import java.io.StringWriter;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
-import java.net.URLEncoder;
+import java.security.GeneralSecurityException;
+import java.security.Key;
+import java.security.KeyFactory;
+import java.security.NoSuchAlgorithmException;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.security.spec.X509EncodedKeySpec;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Hashtable;
 import java.util.Iterator;
+import java.util.Properties;
 import java.util.UUID;
+
+import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.lang.StringEscapeUtils;
 
 import xdi2.client.XDIClient;
 import xdi2.client.exceptions.Xdi2ClientException;
@@ -19,8 +32,15 @@ import xdi2.core.Literal;
 import xdi2.core.Relation;
 import xdi2.core.exceptions.Xdi2ParseException;
 import xdi2.core.features.nodetypes.XdiPeerRoot;
+import xdi2.core.features.signatures.KeyPairSignature;
+import xdi2.core.features.signatures.Signature;
+import xdi2.core.features.signatures.Signatures;
 import xdi2.core.impl.json.memory.MemoryJSONGraphFactory;
 import xdi2.core.impl.memory.MemoryGraph;
+import xdi2.core.impl.memory.MemoryGraphFactory;
+import xdi2.core.io.XDIReader;
+import xdi2.core.io.XDIReaderRegistry;
+import xdi2.core.io.XDIWriter;
 import xdi2.core.io.XDIWriterRegistry;
 import xdi2.core.util.iterators.ReadOnlyIterator;
 import xdi2.core.xri3.CloudNumber;
@@ -42,21 +62,30 @@ public class PersonalCloud {
 			.create("$do");
 
 	public static String DEFAULT_REGISTRY_URI = "http://mycloud.neustar.biz:12220/";
-	// public static String WEBAPP_BASE_URI =
-	// "http://mycloud.neustar.biz:8080/myapp/personalclouds/";
-	public static String WEBAPP_BASE_URI = "http://ACHOWDHU-LTW7.cis.neustar.com:8085/personalclouds/";
+
 	private String secretToken = null;
 	private XDI3Segment linkContractAddress = null;
 
 	private XDI3Segment cloudNumber = null;
 	private XDI3Segment cloudName = null;
-	private XDI3Segment senderCloudNumber = null;
+	private XDI3Segment senderCloudNumber = XDI3Segment.create("$anon");
 	private String registryURI = null;
 	private String cloudEndpointURI = null;
+
 	private ProfileInfo profileInfo = null;
 	private Hashtable<String, ContactInfo> addressBook = new Hashtable<String, ContactInfo>();
 
 	private String sessionId = null;
+
+	private PublicKey signaturePublicKey = null;
+	private PrivateKey signaturePrivateKey = null;
+
+	public static String DEFAULT_DIGEST_ALGORITHM = "sha";
+	public static String DEFAULT_DIGEST_LENGTH = "256";
+	public static String DEFAULT_KEY_ALGORITHM = "rsa";
+	public static String DEFAULT_KEY_LENGTH = "2048";
+
+	private static MemoryGraphFactory graphFactory;
 
 	/*
 	 * factory methods for opening personal clouds
@@ -89,72 +118,52 @@ public class PersonalCloud {
 		XDIDiscoveryClient discovery = new XDIDiscoveryClient();
 		discovery.setRegistryXdiClient(httpClient);
 		try {
-			//ArrayList<XDI3Segment> endpointUriTypes = new ArrayList<XDI3Segment>();
-			//endpointUriTypes.add(XDI3Segment.create("<$xdi>"));
+
 			XDIDiscoveryResult discoveryResult = discovery
-					.discoverFromRegistry(cloudNameOrCloudNumber,
-							null);
+					.discoverFromRegistry(cloudNameOrCloudNumber, null);
 			// if the cloudName or cloudNumber is not registered in the
 			// Registry, then return null
 			if (discoveryResult.getCloudNumber() == null) {
+				System.out
+						.println("No Cloudnumber found in Discovery Result. Returning null.");
 				return null;
 			}
 
 			CloudNumber cnum = discoveryResult.getCloudNumber();
 			pc.cloudNumber = cnum.getXri();
+			if (discoveryResult.getXdiEndpointUri() == null) {
+				System.out
+						.println("No XDI endpoint URI found in Discovery Result. Returning null.");
+				return null;
+			}
 			pc.cloudEndpointURI = discoveryResult.getXdiEndpointUri();
+			pc.setSignaturePublicKey(discoveryResult.getSignaturePublicKey());
+			System.out.println(pc.toString());
 
 		} catch (Xdi2ClientException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 			return null;
+		} catch (Exception ex) {
+			ex.printStackTrace();
 		} finally {
 			httpClient.close();
 		}
 
 		pc.linkContractAddress = linkContractAddress;
-		pc.secretToken = secretToken;
+		if (secretToken != null && !secretToken.isEmpty()) {
+			pc.secretToken = secretToken;
+		}
 		pc.senderCloudNumber = pc.cloudNumber;
 		pc.sessionId = session;
-		// System.out.println(pc.toString());
-		// pc.getProfileInfo();
-		// pc.createDefaultLinkContracts();
-		// if (session == null || session.isEmpty()) {
-		// String sessionId = pc.cloudNumber + "[+session]" + "!:uuid:"
-		// + UUID.randomUUID().toString() ;
-		// long sessionValidityPeriod = Calendar.getInstance().getTimeInMillis()
-		// + 86400*1000;
-		// String expirationDate = sessionId + "$not$valid$after<$t>&/&/"
-		// + sessionValidityPeriod + "";
-		// ArrayList<XDI3Statement> setSessionId = new
-		// ArrayList<XDI3Statement>();
-		// setSessionId.add(XDI3Statement.create(expirationDate));
-		// pc.setXDIStmts(setSessionId);
-		// } else {
-		// pc.sessionId = session;
-		// }
-		if (pc.getWholeGraph() == null) {
-			return null;
-		}
+//		if (secretToken != null && !secretToken.isEmpty()
+//				&& pc.getWholeGraph() == null) {
+//			System.out
+//					.println("Could not process getWholeGraph() with the given secret token. Returning null.");
+//			return null;
+//		}
+
 		return pc;
-	}
-
-	/*
-	 * Under construction
-	 */
-	public String createNewSession(int durationInSecs) {
-		String sessionId = this.cloudNumber + "[+session]" + "!:uuid:"
-				+ UUID.randomUUID().toString();
-		long sessionValidityPeriod = Calendar.getInstance().getTimeInMillis()
-				+ durationInSecs * 1000;
-		String expirationDate = sessionId + "$not$valid$after<$t>&/&/"
-				+ sessionValidityPeriod + "";
-		ArrayList<XDI3Statement> setSessionId = new ArrayList<XDI3Statement>();
-		setSessionId.add(XDI3Statement.create(expirationDate));
-		this.setXDIStmts(setSessionId);
-		this.sessionId = sessionId;
-		return sessionId;
-
 	}
 
 	public static PersonalCloud open(XDI3Segment cloudNameOrCloudNumber,
@@ -173,8 +182,10 @@ public class PersonalCloud {
 		str.append("registryURI\t:\t" + registryURI);
 		str.append("\n");
 		try {
-			str.append("Cloud endpoint URI\t:\t"
-					+ URLDecoder.decode(cloudEndpointURI, "UTF-8"));
+			if (cloudEndpointURI != null) {
+				str.append("Cloud endpoint URI\t:\t"
+						+ URLDecoder.decode(cloudEndpointURI, "UTF-8"));
+			}
 		} catch (UnsupportedEncodingException e) {
 			// TODO Auto-generated catch block
 			str.append("Cloud endpoint URI\t:\tnull");
@@ -202,46 +213,10 @@ public class PersonalCloud {
 	public static PersonalCloud open(XDI3Segment cloudNameOrCloudNumber,
 			XDI3Segment senderCN, XDI3Segment linkContractAddress, String regURI) {
 
-		// like My Cloud Sign-in in clouds.projectdanbe.org
-		// 1. discover the endpoint
-		// 2. test if the secret token is correct by sending a test message
-		PersonalCloud pc = new PersonalCloud();
-		XDIHttpClient httpClient = null;
-		if (regURI != null && regURI.length() > 0) {
-			httpClient = new XDIHttpClient(regURI);
-			pc.registryURI = regURI;
-		} else {
-			httpClient = new XDIHttpClient(DEFAULT_REGISTRY_URI);
-			pc.registryURI = DEFAULT_REGISTRY_URI;
-		}
-		XDIDiscoveryClient discovery = new XDIDiscoveryClient();
+		PersonalCloud pc = PersonalCloud.open(cloudNameOrCloudNumber, "",
+				linkContractAddress, regURI);
 
-		discovery.setRegistryXdiClient(httpClient);
-		try {
-			
-			XDIDiscoveryResult discoveryResult = discovery
-					.discoverFromRegistry(cloudNameOrCloudNumber,
-							null);
-			// if the cloudName or cloudNumber is not registered in the
-			// Registry, then return null
-			if (discoveryResult.getCloudNumber() == null) {
-				return null;
-			}
-
-			pc.cloudNumber = discoveryResult.getCloudNumber().getXri();
-			pc.cloudEndpointURI = discoveryResult.getXdiEndpointUri();
-		} catch (Xdi2ClientException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-			return null;
-		} finally {
-			httpClient.close();
-		}
-
-		pc.linkContractAddress = linkContractAddress;
 		pc.senderCloudNumber = senderCN;
-		System.out.println(pc.toString());
-		// pc.getProfileInfo();
 		return pc;
 	}
 
@@ -258,9 +233,9 @@ public class PersonalCloud {
 		XDIDiscoveryClient discovery = new XDIDiscoveryClient();
 		discovery.setRegistryXdiClient(httpClient);
 		try {
-			
-			discoveryResult = discovery.discoverFromRegistry(XDI3Segment
-					.create(cloudName), null);
+
+			discoveryResult = discovery.discoverFromRegistry(
+					XDI3Segment.create(cloudName), null);
 
 		} catch (Xdi2ClientException e) {
 			// TODO Auto-generated catch block
@@ -288,8 +263,9 @@ public class PersonalCloud {
 				.createPeerRootArcXri(cloudNumber)));
 
 		message.createGetOperation(XDI3Segment.create(""));
+		message = this.signMessage(message);
 
-		// System.out.println("Message :\n" + messageEnvelope + "\n");
+		System.out.println();
 		try {
 			XDIWriterRegistry.forFormat("XDI DISPLAY", null).write(
 					messageEnvelope.getGraph(), System.out);
@@ -298,6 +274,7 @@ public class PersonalCloud {
 			e.printStackTrace();
 		}
 
+		System.out.println();
 		// send the message
 
 		MessageResult messageResult;
@@ -307,8 +284,11 @@ public class PersonalCloud {
 			messageResult = xdiClient.send(messageEnvelope, null);
 			// System.out.println(messageResult);
 			MemoryGraph response = (MemoryGraph) messageResult.getGraph();
+			System.out.println("**************Graph Start***************\n");
 			XDIWriterRegistry.forFormat("XDI DISPLAY", null).write(response,
 					System.out);
+			System.out.println("\n**************Graph End***************");
+
 			return response;
 
 		} catch (Xdi2ClientException ex) {
@@ -538,7 +518,7 @@ public class PersonalCloud {
 	public MessageResult setXDIStmts(ArrayList<XDI3Statement> XDIStmts) {
 
 		// prepare XDI client
-		System.out.println("setXDIStmts 1");
+		
 		XDIClient xdiClient = new XDIHttpClient(cloudEndpointURI);
 
 		// prepare message envelope
@@ -550,21 +530,15 @@ public class PersonalCloud {
 		if (secretToken != null) {
 			message.setSecretToken(secretToken);
 		}
-		// if(this.sessionId != null && !this.sessionId.isEmpty()){
-		//
-		// XdiAttributeSingleton xdiAttribute =
-		// XdiAttributeSingleton.fromContextNode(message.getContextNode().setDeepContextNode(XDI3Segment.create("$public$sessionid<$token>")));
-		// XdiValue xdiValue = xdiAttribute.getXdiValue(true);
-		// xdiValue.getContextNode().setLiteral(sessionId);
-		// }
 		message.setToPeerRootXri(XDI3Segment.fromComponent(XdiPeerRoot
 				.createPeerRootArcXri(cloudNumber)));
-		System.out.println("setXDIStmts 2.5");
+		
 		if (XDIStmts != null && XDIStmts.size() > 0) {
 			message.createSetOperation(XDIStmts.iterator());
 		}
-		System.out.println("setXDIStmts 3");
-
+		
+		message = this.signMessage(message);
+		System.out.println();
 		// System.out.println("Message :\n" + messageEnvelope + "\n");
 		try {
 			XDIWriterRegistry.forFormat("XDI DISPLAY", null).write(
@@ -573,7 +547,7 @@ public class PersonalCloud {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-
+		System.out.println();
 		// send the message
 
 		MessageResult messageResult = null;
@@ -788,30 +762,7 @@ public class PersonalCloud {
 
 		// prepare message envelope
 
-		MessageEnvelope messageEnvelope = new MessageEnvelope();
-		Message message = messageEnvelope.createMessage(senderCloudNumber, 0);
-		message.setLinkContractXri(linkContractAddress);
-		if (secretToken != null) {
-			message.setSecretToken(secretToken);
-		}
-		message.setToPeerRootXri(XDI3Segment.fromComponent(XdiPeerRoot
-				.createPeerRootArcXri(cloudNumber)));
-
-		GetOperation getOp = message.createGetOperation(query);
-		if (isDeref) {
-			getOp.setParameter(XDI3SubSegment.create("$deref"), "true");
-		}
-		// System.out.println("Message :\n" + messageEnvelope + "\n");
-		try {
-			XDIWriterRegistry.forFormat("XDI DISPLAY", null).write(
-					messageEnvelope.getGraph(), System.out);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-
-		// send the message
-
+		MessageEnvelope messageEnvelope = this.buildMessage(query, isDeref, true);
 		MessageResult messageResult = null;
 
 		try {
@@ -834,6 +785,66 @@ public class PersonalCloud {
 		return messageResult;
 	}
 
+	public MessageEnvelope buildMessage (XDI3Segment query, boolean isDeref, boolean withSignature) {
+		// prepare message envelope
+
+		MessageEnvelope messageEnvelope = new MessageEnvelope();
+		Message message = messageEnvelope.createMessage(senderCloudNumber, 0);
+		message.setLinkContractXri(linkContractAddress);
+		if (secretToken != null) {
+			message.setSecretToken(secretToken);
+		}
+		message.setToPeerRootXri(XDI3Segment.fromComponent(XdiPeerRoot
+				.createPeerRootArcXri(cloudNumber)));
+
+		GetOperation getOp = message.createGetOperation(query);
+		if (isDeref) {
+			getOp.setParameter(XDI3SubSegment.create("$deref"), "true");
+		}
+		if(withSignature){
+			message = this.signMessage(message);
+		}
+		// System.out.println("Message :\n" + messageEnvelope + "\n");
+		System.out.println();
+		try {
+			XDIWriterRegistry.forFormat("XDI DISPLAY", null).write(
+					messageEnvelope.getGraph(), System.out);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		System.out.println();
+		return messageEnvelope;
+	}
+
+	public MessageResult getXDIStmtsNoSig(XDI3Segment query, boolean isDeref) {
+
+		XDIClient xdiClient = new XDIHttpClient(cloudEndpointURI);
+
+		// prepare message envelope
+
+		MessageEnvelope messageEnvelope = this.buildMessage(query, isDeref, false);
+		MessageResult messageResult = null;
+
+		try {
+
+			messageResult = xdiClient.send(messageEnvelope, null);
+			// System.out.println(messageResult);
+			MemoryGraph response = (MemoryGraph) messageResult.getGraph();
+			XDIWriterRegistry.forFormat("XDI DISPLAY", null).write(response,
+					System.out);
+
+		} catch (Xdi2ClientException ex) {
+
+			ex.printStackTrace();
+		} catch (Exception ex) {
+
+			ex.printStackTrace();
+		} finally {
+			xdiClient.close();
+		}
+		return messageResult;
+	}
 	/*
 	 * contact info
 	 */
@@ -2095,223 +2106,10 @@ public class PersonalCloud {
 		return sessionId;
 	}
 
-	/*
-	 * {
-	 * "[@]!:uuid:e0178407-b7b6-43f9-e017-8407b7b643f9{$from}[$do]!:uuid:11c43ab0-6ce5-4084-b1bc-9f4a07a27328/$get"
-	 * : [ "{$to}<+email>", "{$to}<+name>" ],
-	 * "[@]!:uuid:e0178407-b7b6-43f9-e017-8407b7b643f9{$from}[$do]!:uuid:11c43ab0-6ce5-4084-b1bc-9f4a07a27328$if$and/$true"
-	 * : [ { "{$from}/$is": [ "[@]!:uuid:e0178407-b7b6-43f9-e017-8407b7b643f9"
-	 * ], "{$msg}<$sig><$valid>&/&": true } ],
-	 * "[@]!:uuid:e0178407-b7b6-43f9-e017-8407b7b643f9{$from}[$do]!:uuid:11c43ab0-6ce5-4084-b1bc-9f4a07a27328<$sig>/$is+"
-	 * : [ "$sha$256$rsa$2048" ],
-	 * "[@]!:uuid:e0178407-b7b6-43f9-e017-8407b7b643f9{$from}[$do]!:uuid:11c43ab0-6ce5-4084-b1bc-9f4a07a27328<$sig>&/&"
-	 * : "..." }
-	 */
-
-	public String showAuthenticationForm(String respectConnectRequest,
-			String respondingPartyCloudName, String respondingPartyCloudNumber,
-			String successurl, String failureurl, String relayState) {
-
-		String result = null;
-		System.out.println("Connect Request :\n" + respectConnectRequest);
-		System.out.println("respondingPartyCloudName :\n"
-				+ respondingPartyCloudName);
-		System.out.println("respondingPartyCloudNumber : \n"
-				+ respondingPartyCloudNumber);
-		MemoryJSONGraphFactory graphFactory = new MemoryJSONGraphFactory();
-		String templateOwnerInumber = null;
-		try {
-			Graph g = graphFactory.parseGraph(respectConnectRequest);
-			// get remote cloud number
-
-			XDIWriterRegistry.forFormat("XDI DISPLAY", null).write(g,
-					System.out);
-			ContextNode c = g.getRootContextNode();
-			ReadOnlyIterator<ContextNode> allCNodes = c.getAllContextNodes();
-			for (ContextNode ci : allCNodes) {
-				if (ci.containsContextNode(XDI3SubSegment.create("[$msg]"))) {
-					templateOwnerInumber = ci.toString(); // .substring(0,
-															// ci.toString().length()-new
-															// String("{$from}").length());
-					System.out.println(templateOwnerInumber);
-					break;
-				}
-			}
-			if (templateOwnerInumber == null) {
-				System.out
-						.println("No cloudnumber for requestor/template owner");
-				return result;
-			}
-			// get the address of the link contract template
-			// $set{$do}
-
-			String lcTemplateAddress = null;
-
-			ReadOnlyIterator<Relation> allRelations = c.getAllRelations(); // g.getDeepRelations(XDI3Segment.create(templateOwnerInumber),XDI3Segment.create("$get"));
-			for (Relation r : allRelations) {
-				if (r.getArcXri().toString().equals("$set{$do}")) {
-					lcTemplateAddress = r.getTargetContextNodeXri().toString();
-					System.out.println(r.getTargetContextNodeXri());
-				}
-
-			}
-			if (lcTemplateAddress == null) {
-				System.out.println("No LC template address provided");
-				return result;
-			}
-			// address of meta link contract in ACME's cloud :
-			// {$to}[@]!:uuid:e0178407-b7b6-43f9-e017-8407b7b643f9$from[@]!:uuid:e0178407-b7b6-43f9-e017-8407b7b643f9+registration$do
-			/*
-			 * String meta_link_contract = "{$to}" + templateOwnerInumber +
-			 * "{$from}" + templateOwnerInumber + "+registration$do";
-			 * 
-			 * PersonalCloud remoteCloud =
-			 * PersonalCloud.open(XDI3Segment.create(templateOwnerInumber),
-			 * this.cloudNumber, XDI3Segment.create("$public$do"), "");
-			 * ArrayList<XDI3Segment> querySegments = new
-			 * ArrayList<XDI3Segment>();
-			 * querySegments.add(XDI3Segment.create(templateOwnerInumber +
-			 * "<+name>"));
-			 * 
-			 * ArrayList<XDI3Statement> queryStmts = new
-			 * ArrayList<XDI3Statement>();
-			 * queryStmts.add(XDI3Statement.create(templateOwnerInumber +
-			 * "/$is$ref/{}")); MessageResult responseFromRemoteCloud =
-			 * remoteCloud.sendQueries(querySegments, queryStmts,false);
-			 * 
-			 * Graph responseGraph = responseFromRemoteCloud.getGraph();
-			 * ContextNode responseRootContext =
-			 * responseGraph.getRootContextNode();
-			 * 
-			 * querySegments = new ArrayList<XDI3Segment>();
-			 * querySegments.add(XDI3Segment.create(lcTemplateAddress));
-			 * remoteCloud
-			 * .setLinkContractAddress(XDI3Segment.create(meta_link_contract));
-			 * MessageResult responseFromRemoteCloud2 =
-			 * remoteCloud.sendQueries(querySegments, queryStmts,false); Graph
-			 * responseGraph2 = responseFromRemoteCloud2.getGraph(); ContextNode
-			 * responseRootContext2 = responseGraph2.getRootContextNode();
-			 * 
-			 * //get requested data fields
-			 * 
-			 * ArrayList<XDI3Segment> getDataFields = new
-			 * ArrayList<XDI3Segment>();
-			 * 
-			 * ReadOnlyIterator<Relation> getRelations =
-			 * responseRootContext2.getAllRelations() ;
-			 * //g.getDeepRelations(XDI3Segment
-			 * .create(templateOwnerInumber),XDI3Segment.create("$get"));
-			 * for(Relation r : getRelations){
-			 * if(r.getArcXri().toString().equals("$get")){
-			 * getDataFields.add(r.getTargetContextNodeXri());
-			 * System.out.println(r.getTargetContextNodeXri()); }
-			 * 
-			 * }
-			 * 
-			 * Literal requestingPartyNameLit =
-			 * responseRootContext.getDeepLiteral
-			 * (XDI3Segment.create(templateOwnerInumber + "<+name>&")); Relation
-			 * requestingPartyCloudnameRel =
-			 * responseRootContext.getDeepRelation(
-			 * XDI3Segment.create(templateOwnerInumber
-			 * ),XDI3Segment.create("$is$ref")); String
-			 * requestingPartyCloudNumberCtx =
-			 * requestingPartyCloudnameRel.getTargetContextNodeXri().toString();
-			 */
-			// prepare secret token input HTML
-
-			StringBuffer buf = new StringBuffer();
-			/*
-			 * buf.append(
-			 * "<html><head></head><div id=\"authn_form\" style=\"position: relative; top: 61px; left: 64px; z-index: 1000;display: block;\">"
-			 * ); buf.append("<body>"); buf.append("<p>Hello : ");
-			 * buf.append(respondingPartyCloudName);
-			 * buf.append(", welcome to your Connect Service.</p>");
-			 * buf.append("<p>Please authenticate:</p>"); // buf.append(
-			 * "<form action=\"http://mycloud.neustar.biz:8080/myapp/personalclouds/"
-			 * ); buf.append("<form action=\"" + WEBAPP_BASE_URI);
-			 * buf.append(URLEncoder.encode(respondingPartyCloudNumber,
-			 * "UTF-8")); buf.append("/connect/authorize/\" method=\"post\">");
-			 * // buf.append(
-			 * "<input type=\"hidden\" name=\"lcTemplateAddress\" value=\""); //
-			 * buf.append(lcTemplateAddress); // buf.append("\">"); //
-			 * buf.append("</input>"); //
-			 * buf.append("<input type=\"hidden\" name=\"relyingParty\" value=\""
-			 * ); // buf.append(templateOwnerInumber); // buf.append("\">"); //
-			 * buf.append("</input>");
-			 * buf.append("<input type=\"hidden\" name=\"successurl\" value=\""
-			 * + successurl + "\">"); buf.append("</input>");
-			 * buf.append("<input type=\"hidden\" name=\"failureurl\" value=\""
-			 * + failureurl + "\">"); buf.append("</input>");
-			 * buf.append("<input type=\"hidden\" name=\"cloudname\" value=\"" +
-			 * respondingPartyCloudName + "\">"); buf.append("</input>");
-			 * buf.append("<input type=\"hidden\" name=\"relayState\" value=\""
-			 * + relayState + "\">"); buf.append("</input>"); //
-			 * buf.append("<input type=\"hidden\" name=\"connectRequest\" value=\""
-			 * ); //
-			 * buf.append(URLEncoder.encode(respectConnectRequest,"UTF-8")); //
-			 * buf.append("\">");
-			 * buf.append("<input type=\"hidden\" name=\"connectRequest\" value=\'"
-			 * ); buf.append(respectConnectRequest); buf.append("\'>");
-			 * 
-			 * buf.append("</input>"); buf.append(
-			 * "Your Secret Token: <input type=\"password\" name=\"secrettoken\"/><br>"
-			 * );
-			 * buf.append("<input type=\"submit\" value=\"Authenticate!\"/>");
-			 * buf.append("</form>"); buf.append("</div>");
-			 * buf.append("</body>"); buf.append("</html>");
-			 */
-			buf.append("<html><head><title>Personal Cloud Login</title></head><body>");
-			buf.append("<div id='authn_form' style='position: relative; top: 61px; left: 64px; z-index: 1000;display: block; border:2px solid; border-radius:25px; width:400px;padding:10px; background-color:lightgrey;  margin:0 auto; '>");
-			buf.append("<div  style='border:2px solid; border-radius:25px;text-align:center; background-color:grey; color:white;' >Connection Manager - Login </div>");
-			buf.append("<p>Hello :<b> ");
-			buf.append(respondingPartyCloudName);
-			buf.append("</b>, welcome to your Connection Manager.</p>");
-			buf.append("<p>We need to check that you are you:</p>");
-			buf.append("<form action=\"" + WEBAPP_BASE_URI);
-			buf.append(URLEncoder.encode(respondingPartyCloudNumber, "UTF-8"));
-			buf.append("/connect/authorize/\" method=\"post\">");
-			buf.append("<input type=\"hidden\" name=\"successurl\" value=\""
-					+ successurl + "\">");
-			buf.append("</input>");
-			buf.append("<input type=\"hidden\" name=\"failureurl\" value=\""
-					+ failureurl + "\">");
-			buf.append("</input>");
-			buf.append("<input type=\"hidden\" name=\"cloudname\" value=\""
-					+ respondingPartyCloudName + "\">");
-			buf.append("</input>");
-			buf.append("<input type=\"hidden\" name=\"relayState\" value=\""
-					+ relayState + "\">");
-			buf.append("</input>");
-			buf.append("<input type=\"hidden\" name=\"connectRequest\" value=\'");
-			buf.append(respectConnectRequest);
-			buf.append("\'>");
-			buf.append("</input>");
-			buf.append("Enter your password: <input type=\"password\" name=\"secrettoken\"/><br>");
-			buf.append(" <div style='text-align:center;position:relative;top:12px;'><input type=\"submit\" value=\"Login\"/>");
-			buf.append("&nbsp;&nbsp;<input type='button' value='Cancel' ></div>");
-			buf.append("</form>");
-			buf.append("</body>");
-			buf.append("</div>");
-			buf.append("</html>");
-
-			result = buf.toString();
-			System.out.println("Result HTML:\n" + result);
-
-		} catch (Xdi2ParseException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		return result;
-
-	}
-
 	public boolean showApprovalForm2(String connectRequest,
-			String respondingPartyCloudNumberEncoded, String authToken , Hashtable<String, String> formParams, Hashtable<String, String> requestedFields) {
-		
+			String respondingPartyCloudNumberEncoded, String authToken,
+			Hashtable<String, String> formParams,
+			Hashtable<String, String> requestedFields) {
 
 		String respondingPartyCloudNumber = null;
 		try {
@@ -2322,7 +2120,7 @@ public class PersonalCloud {
 			// TODO Auto-generated catch block
 			e1.printStackTrace();
 		}
-		//System.out.println("Connect Request :\n" + connectRequest);
+		// System.out.println("Connect Request :\n" + connectRequest);
 
 		System.out.println("respondingPartyCloudNumber : \n"
 				+ respondingPartyCloudNumber);
@@ -2360,7 +2158,7 @@ public class PersonalCloud {
 
 			String lcTemplateAddress = null;
 
-			ReadOnlyIterator<Relation> allRelations = c.getAllRelations(); 
+			ReadOnlyIterator<Relation> allRelations = c.getAllRelations();
 			for (Relation r : allRelations) {
 				if (r.getArcXri().toString().equals("$set{$do}")) {
 					lcTemplateAddress = r.getTargetContextNodeXri().toString();
@@ -2411,7 +2209,7 @@ public class PersonalCloud {
 				if (r.getArcXri().toString().equals("$get")) {
 
 					getDataFields.add(r.getTargetContextNodeXri());
-					//System.out.println(r.getTargetContextNodeXri());
+					// System.out.println(r.getTargetContextNodeXri());
 
 				}
 
@@ -2454,7 +2252,8 @@ public class PersonalCloud {
 			}
 			formParams.put("linkContractTemplateAddress", lcTemplateAddress);
 			formParams.put("requestingPartyCloudNumber", templateOwnerInumber);
-			formParams.put("requestingPartyCloudName", requestingPartyCloudName);
+			formParams
+					.put("requestingPartyCloudName", requestingPartyCloudName);
 		} catch (Xdi2ParseException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -2468,414 +2267,11 @@ public class PersonalCloud {
 		return true;
 	}
 
-	public String showApprovalForm(String connectRequestEncoded,
-			String respondingPartyCloudNumberEncoded, String authToken,
-			String successurl, String failureurl, String cloudname,
-			String relayState) {
-		String result = "<html><body>Aw snap ! The request did not go through ... Better luck next time !</body> </html>";
-
-		String connectRequest = null, respondingPartyCloudNumber = null;
-		try {
-			connectRequest = connectRequestEncoded; // URLDecoder.decode(connectRequestEncoded,
-													// "UTF-8");
-			respondingPartyCloudNumber = URLDecoder.decode(
-					respondingPartyCloudNumberEncoded, "UTF-8");
-		} catch (UnsupportedEncodingException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
-		System.out.println("Connect Request :\n" + connectRequest);
-
-		System.out.println("respondingPartyCloudNumber : \n"
-				+ respondingPartyCloudNumber);
-
-		System.out.println("Auth Token : \n" + authToken);
-		this.secretToken = authToken;
-		this.linkContractAddress = PersonalCloud.XRI_S_DEFAULT_LINKCONTRACT;
-		this.cloudNumber = XDI3Segment.create(respondingPartyCloudNumber);
-		this.senderCloudNumber = XDI3Segment.create(respondingPartyCloudNumber);
-
-		MemoryJSONGraphFactory graphFactory = new MemoryJSONGraphFactory();
-		String templateOwnerInumber = null;
-		try {
-			Graph g = graphFactory.parseGraph(connectRequest);
-			// get remote cloud number
-
-			XDIWriterRegistry.forFormat("XDI DISPLAY", null).write(g,
-					System.out);
-			ContextNode c = g.getRootContextNode();
-			ReadOnlyIterator<ContextNode> allCNodes = c.getAllContextNodes();
-			for (ContextNode ci : allCNodes) {
-				if (ci.containsContextNode(XDI3SubSegment.create("[$msg]"))) {
-					templateOwnerInumber = ci.toString();
-					System.out.println(templateOwnerInumber);
-					break;
-				}
-			}
-			if (templateOwnerInumber == null) {
-				System.out
-						.println("No cloudnumber for requestor/template owner");
-				return result;
-			}
-			// get the address of the link contract template
-			// $set{$do}
-
-			String lcTemplateAddress = null;
-
-			ReadOnlyIterator<Relation> allRelations = c.getAllRelations(); // g.getDeepRelations(XDI3Segment.create(templateOwnerInumber),XDI3Segment.create("$get"));
-			for (Relation r : allRelations) {
-				if (r.getArcXri().toString().equals("$set{$do}")) {
-					lcTemplateAddress = r.getTargetContextNodeXri().toString();
-					System.out.println(r.getTargetContextNodeXri());
-				}
-
-			}
-			if (lcTemplateAddress == null) {
-				System.out.println("No LC template address provided");
-				return result;
-			}
-			String meta_link_contract = "{$to}" + templateOwnerInumber
-					+ "{$from}" + templateOwnerInumber + "+registration$do";
-
-			PersonalCloud remoteCloud = PersonalCloud.open(
-					XDI3Segment.create(templateOwnerInumber), this.cloudNumber,
-					XDI3Segment.create("$public$do"), "");
-			ArrayList<XDI3Segment> querySegments = new ArrayList<XDI3Segment>();
-			querySegments.add(XDI3Segment.create(templateOwnerInumber
-					+ "<+name>"));
-
-			querySegments.add(XDI3Segment.create(lcTemplateAddress));
-
-			ArrayList<XDI3Statement> queryStmts = new ArrayList<XDI3Statement>();
-			queryStmts.add(XDI3Statement.create(templateOwnerInumber
-					+ "/$is$ref/{}"));
-			MessageResult responseFromRemoteCloud = null;
-
-			try {
-				responseFromRemoteCloud = remoteCloud.sendQueries(
-						querySegments, queryStmts, false);
-			} catch (Exception ex) {
-				return result;
-			}
-			if (responseFromRemoteCloud == null) {
-				return result;
-			}
-
-			Graph responseGraph = responseFromRemoteCloud.getGraph();
-			ContextNode responseRootContext = responseGraph
-					.getRootContextNode();
-
-			ArrayList<XDI3Segment> getDataFields = new ArrayList<XDI3Segment>();
-
-			ReadOnlyIterator<Relation> getRelations = responseRootContext
-					.getAllRelations();
-			for (Relation r : getRelations) {
-				if (r.getArcXri().toString().equals("$get")) {
-
-					getDataFields.add(r.getTargetContextNodeXri());
-					System.out.println(r.getTargetContextNodeXri());
-
-				}
-
-			}
-
-			Literal requestingPartyNameLit = responseRootContext
-					.getDeepLiteral(XDI3Segment.create(templateOwnerInumber
-							+ "<+name>&"));
-			Relation requestingPartyCloudnameRel = responseRootContext
-					.getDeepRelation(XDI3Segment.create(templateOwnerInumber),
-							XDI3Segment.create("$is$ref"));
-			String requestingPartyCloudNumberCtx = requestingPartyCloudnameRel
-					.getTargetContextNodeXri().toString();
-
-			querySegments = new ArrayList<XDI3Segment>();
-			queryStmts = new ArrayList<XDI3Statement>();
-			for (XDI3Segment dataField : getDataFields) {
-				String dataFieldStr = dataField.toString();
-				if (!dataFieldStr.contains("$is$ref")) {
-					dataFieldStr = dataFieldStr.replace("{$to}",
-							respondingPartyCloudNumber);
-
-					querySegments.add(XDI3Segment.create(dataFieldStr));
-				}
-			}
-			MessageResult responseFromThisCloud = this.sendQueries(
-					querySegments, queryStmts, false);
-
-			Graph responseGraph3 = responseFromThisCloud.getGraph();
-			ContextNode responseRootContext3 = responseGraph3
-					.getRootContextNode();
-			ReadOnlyIterator<Literal> allLiteralsFromResponse = responseRootContext3
-					.getAllLiterals();
-
-			// prepare authorization input HTML
-
-			StringBuffer buf = new StringBuffer();
-			/*
-			 * buf.append("<html><head>");
-			 * 
-			 * buf.append("<SCRIPT LANGUAGE=\"JavaScript\">"); buf.append(
-			 * "function buttonClick(val){ document.getElementById('buttonClicked').value = val; return true; }"
-			 * ); buf.append("</SCRIPT></head>"); buf.append("<body>");
-			 * buf.append(
-			 * "<div id=\"authz_form\" style=\"position: relative; top: 61px; left: 64px; z-index: 1000;display: block;\"><p>Link Contract Authorization Form</p>"
-			 * ); buf.append("<p>");
-			 * buf.append(requestingPartyNameLit.getLiteralDataString() +
-			 * "(Cloud Name: " + requestingPartyCloudNumberCtx +
-			 * ") is offering to connect to your Cloud via Respect Connect.</p>"
-			 * ); buf.append("<p>Please approve the link contract:</p>");
-			 * buf.append("<form action=\"" + WEBAPP_BASE_URI);
-			 * buf.append(URLEncoder.encode(respondingPartyCloudNumber,
-			 * "UTF-8")); buf.append("/connect/approve/\" method=\"post\">");
-			 * 
-			 * for (Literal lit : allLiteralsFromResponse) { String str = new
-			 * String("<input type=\"checkbox\" name=\"") + "fieldchoices" +
-			 * "\""; str += " value=\'"; // str +=
-			 * URLEncoder.encode(lit.getLiteralDataString(),"UTF-8"); str +=
-			 * lit.getContextNode().toString() + "|" +
-			 * lit.getLiteralDataString(); str += "\'>"; str +=
-			 * lit.getLiteralDataString(); str += "</input>"; buf.append(str); }
-			 * buf.append(
-			 * "<input type=\"hidden\" name=\"buttonClicked\" id=\"buttonClicked\"  /> <br>"
-			 * );
-			 * buf.append("<input type=\"hidden\" name=\"authToken\" value=\"");
-			 * buf.append(authToken); buf.append("\">"); buf.append("</input>");
-			 * buf.append(
-			 * "<input type=\"hidden\" name=\"linkContractTemplateAddress\" value=\'"
-			 * ); buf.append(lcTemplateAddress); buf.append("\'>"); buf.append(
-			 * "<input type=\"hidden\" name=\"relyingPartyCloudNumber\" value=\'"
-			 * ); buf.append(templateOwnerInumber); buf.append("\'>");
-			 * buf.append("<input type=\"hidden\" name=\"successurl\" value=\""
-			 * + successurl + "\">"); buf.append("</input>");
-			 * buf.append("<input type=\"hidden\" name=\"failureurl\" value=\""
-			 * + failureurl + "\">"); buf.append("</input>");
-			 * buf.append("<input type=\"hidden\" name=\"cloudname\" value=\"" +
-			 * cloudname + "\">"); buf.append("</input>");
-			 * buf.append("<input type=\"hidden\" name=\"relayState\" value=\""
-			 * + relayState + "\">"); buf.append("</input>");
-			 * buf.append("<input type=\"hidden\" name=\"connectRequest\" value=\'"
-			 * ); buf.append(connectRequest); buf.append("\'>"); buf.append(
-			 * "<input type=\"submit\" value=\"Approve!\" onclick=\"return buttonClick('Approve')\" />"
-			 * ); buf.append(
-			 * "<input type=\"submit\" value=\"Reject!\" onclick=\"return buttonClick('Reject')\" />"
-			 * ); buf.append("</form>"); buf.append("</div>");
-			 * buf.append("</body>"); buf.append("</html>");
-			 */
-			buf.append("<html><head>");
-
-			buf.append("<SCRIPT LANGUAGE=\"JavaScript\">");
-			buf.append("function buttonClick(val){ document.getElementById('buttonClicked').value = val; return true; }");
-			buf.append("</SCRIPT></head>");
-			buf.append("<body>");
-
-			// start the outer div
-			buf.append("<div id=\"authz_form\" style='position: relative; top: 61px; z-index: 1000;display: block; border:2px solid; border-radius:25px; width:600px;height:382px;padding:10px; background-color:lightgrey;  margin:0 auto; overflow: hidden;'>");
-			buf.append("<div  style='border:2px solid; border-radius:25px 25px 0px 0px ;text-align:center; background-color:grey; color:white;' >Connection Manager - Authorization </div>");
-
-			// *start the white inner box
-			buf.append("<div style='background-color:white;position:relative;top:10px;padding:10px;overflow: hidden;height:325px;border-radius: 0px 0px 25px 25px;'>");
-
-			// **start the requester corner
-			buf.append("<div style='position: relative;top: 15px;left: 10px;height: 70px;width: 285px;' >");
-
-			// fake the requesting corner
-			if (requestingPartyCloudNumberCtx.equalsIgnoreCase("@acmebread")) {
-
-				buf.append("<div style='position: relative;top: -10px;left: 10px;height: 70px;width: 285px;' >");
-				buf.append("<img src='http://acme.respectnetwork.net/acmedemo/acme-logo.png' alt='' />	<br />");
-				buf.append("<div style='text-align: right;width: 240px;'> Member since: <b>March 2013</b> </div>");
-
-			} else {
-				buf.append(requestingPartyNameLit.getLiteralDataString()
-						+ "(Cloud Name: "
-						+ requestingPartyCloudNumberCtx
-						+ ") is offering to connect to your Cloud via Respect Connect.");
-
-			}
-
-			buf.append("</div>	");
-			// **end the requester corner
-
-			// **start the reputation corner
-
-			// put in the top right 'reputation' area
-			buf.append("<div name='reputationBlock'  style='position:relative; top:-64px;left:330px'>");
-			buf.append("<div style='position:relative; top:0px;left:0px' >");
-			buf.append("<div style='position:relative; top:0px;left:0px;color:#336699;font-size:14pt; font-weight:bold;text-align:center;width:131px;' >Respect</div>");
-			buf.append("<div style='position:relative; top:0px;left:0px;color:#ff6633;font-size:14pt; font-weight:bold;text-align:center;width:131px;'>Connections</div>");
-			buf.append("</div>");
-			buf.append("<div style='position:relative; top:-45px;left:133px;font-size:14pt; font-weight:bold;text-align:center;height:40px;width:75px;border:3px solid; border-radius:25px;vertical-align: middle;display:table-cell;'>304</div>");
-			buf.append("</div>");
-			// **end the reputation corner
-
-			// start the form
-			buf.append("<form action=\"" + WEBAPP_BASE_URI);
-			buf.append(URLEncoder.encode(respondingPartyCloudNumber, "UTF-8"));
-			buf.append("/connect/approve/\" method=\"post\">");
-
-			// start bottom left authZ form
-
-			buf.append("<div name='dataAuth' style='border:0px solid;position:relative;top:-75px;left:15px;width:300px'>");
-			buf.append("<div>Personal data requested: </div>");
-
-			// start data list
-			buf.append(" <div style='border:0px solid;position:relative;top:10px;left:10px;width:250px'>");
-
-			buf.append("<table>");
-			buf.append("<tr>");
-
-			buf.append("<td>");
-
-			buf.append("Display Name:");
-
-			buf.append("</td>");
-			buf.append("<td>");
-
-			String val = "";
-			String name = "";
-
-			for (Literal lit : allLiteralsFromResponse) {
-				String str = new String("<input type=\"checkbox\" name=\"")
-						+ "fieldchoices" + "\"";
-				str += " value=\'";
-				// str += URLEncoder.encode(lit.getLiteralDataString(),"UTF-8");
-				str += lit.getContextNode().toString() + "|"
-						+ lit.getLiteralDataString();
-				str += "\'>";
-				str += lit.getLiteralDataString();
-				str += "</input>";
-				buf.append(str);
-			}
-
-			buf.append("<select>");
-			buf.append("<option value='");
-
-			buf.append(val + "'>");
-
-			buf.append(name + "</option>");
-
-			buf.append("</select>");
-			buf.append("</td>");
-
-			buf.append("</tr>");
-			buf.append("<tr>");
-
-			buf.append("<td>");
-
-			buf.append("Email:");
-			buf.append("</td>");
-			buf.append("<td>");
-			buf.append("<select>");
-			buf.append("<option value='email@domain.com'>email@domain.com</option>");
-			buf.append("<option value='myname@gmail.com'>myname@gmail.com</option>");
-			buf.append("<option value='something@yahoo.com'>something@yahoo.com</option>");
-			buf.append("</select>");
-
-			buf.append("</td>");
-			buf.append("</tr>");
-			buf.append("<tr>");
-
-			buf.append("<td>");
-			buf.append("Zip Code:");
-			buf.append("</td>");
-			buf.append("<td>");
-			buf.append("<select>");
-			buf.append("<option value='95120'>95120</option>");
-			buf.append("<option value='94702'>94702</option>");
-			buf.append("</select>");
-
-			buf.append("</td>");
-			buf.append("</tr>");
-
-			buf.append("</table>");
-
-			// end data list
-			buf.append("<div>");
-
-			buf.append("<input type=\"hidden\" name=\"buttonClicked\" id=\"buttonClicked\"  /> <br>");
-			buf.append("<input type=\"hidden\" name=\"authToken\" value=\"");
-			buf.append(authToken);
-			buf.append("\">");
-			buf.append("</input>");
-			buf.append("<input type=\"hidden\" name=\"linkContractTemplateAddress\" value=\'");
-			buf.append(lcTemplateAddress);
-			buf.append("\'>");
-			buf.append("<input type=\"hidden\" name=\"relyingPartyCloudNumber\" value=\'");
-			buf.append(templateOwnerInumber);
-			buf.append("\'>");
-			buf.append("<input type=\"hidden\" name=\"successurl\" value=\""
-					+ successurl + "\">");
-			buf.append("</input>");
-			buf.append("<input type=\"hidden\" name=\"failureurl\" value=\""
-					+ failureurl + "\">");
-			buf.append("</input>");
-			buf.append("<input type=\"hidden\" name=\"cloudname\" value=\""
-					+ cloudname + "\">");
-			buf.append("</input>");
-			buf.append("<input type=\"hidden\" name=\"relayState\" value=\""
-					+ relayState + "\">");
-			buf.append("</input>");
-			buf.append("<input type=\"hidden\" name=\"connectRequest\" value=\'");
-			buf.append(connectRequest);
-			buf.append("\'>");
-
-			// end bottom left authZ form
-			buf.append("</div >");
-
-			// start right permisions form
-			buf.append("<div style='border:0px solid;position:relative;top:-140px;left:283px;width:250px'>");
-
-			buf.append("Permissions requested:<br>");
-
-			buf.append("<div style='padding:6px'>");
-			buf.append("<div style='padding:3px'>");
-			buf.append("<input type='checkbox'> Send daily news summary");
-			buf.append("</div>");
-			buf.append("<div style='padding:3px'>");
-			buf.append("<input type='checkbox'> Send weekly news summary");
-
-			buf.append("</div>");
-			buf.append("</div>");
-			// end right permisions form
-			buf.append("</div>");
-
-			// start bottom bottom button bar
-			buf.append("<div style='text-align:center;width:500px; position:relative;top:-75px;'>");
-
-			buf.append("<input type=\"submit\" value=\"Approve!\" onclick=\"return buttonClick('Approve')\" />");
-			buf.append("<input type=\"submit\" value=\"Reject!\" onclick=\"return buttonClick('Reject')\" />");
-
-			// end bottom bottom button bar
-			buf.append("</div>");
-
-			buf.append("</form>");
-
-			// start the inner white div
-			buf.append("</div>");
-
-			// end the outer div
-			buf.append("</div>");
-			buf.append("</body>");
-			buf.append("</html>");
-
-			result = buf.toString();
-
-		} catch (Xdi2ParseException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		System.out.println("Result HTML:\n" + result);
-		return result;
-	}
-
 	public String processApprovalForm2(String linkContractTemplateAddress,
 			String relyingPartyCloudNumber, String respondingPartyCloudNumber,
 			String secrettoken, String[] selectedValues) {
 		String xdiResponseValues = new String();
-	
+
 		ArrayList<XDI3Statement> setStatements = new ArrayList<XDI3Statement>();
 		String isPlusstmt = new String();
 		isPlusstmt += respondingPartyCloudNumber;
@@ -2906,8 +2302,6 @@ public class PersonalCloud {
 		policyStmt += relyingPartyCloudNumber;
 		policyStmt += "+registration$do$if$and/$true/({$msg}<$sig><$valid>&/&/true)";
 		setStatements.add(XDI3Statement.create(policyStmt));
-
-
 
 		for (int i = 0; (selectedValues != null) && (i < selectedValues.length); i++) {
 			String value = selectedValues[i];
@@ -2967,162 +2361,8 @@ public class PersonalCloud {
 						+ requestingPartyCloudNumberCtx + "";
 			}
 		}
-		
-	
+
 		return xdiResponseValues;
-	}
-	public String processApprovalForm(String linkContractTemplateAddress,
-			String relyingPartyCloudNumber, String respondingPartyCloudNumber,
-			String secrettoken, String[] selectedValues, String successurl,
-			String failureurl, String cloudname, String relayState) {
-
-		String result = new String();
-		// create a link contract instance
-		/*
-		 * [=]!:uuid:2$to[@]!:uuid:1$from[@]!:uuid:1+registration$do/$get/[=]!:uuid
-		 * :2<+tel>
-		 * <<respondingPartyCloudNumber>>$to<<templateOwnerInumber>>$from
-		 * <<templateOwnerInumber>>+registration$do/$get/<<data element
-		 * address>>
-		 */
-		ArrayList<XDI3Statement> setStatements = new ArrayList<XDI3Statement>();
-		String isPlusstmt = new String();
-		isPlusstmt += respondingPartyCloudNumber;
-		isPlusstmt += "$to";
-		isPlusstmt += relyingPartyCloudNumber;
-		isPlusstmt += "$from";
-		isPlusstmt += relyingPartyCloudNumber;
-		isPlusstmt += "+registration$do/$is+/";
-		isPlusstmt += linkContractTemplateAddress;
-
-		setStatements.add(XDI3Statement.create(isPlusstmt));
-
-		String policyStmt = new String();
-		policyStmt += respondingPartyCloudNumber;
-		policyStmt += "$to";
-		policyStmt += relyingPartyCloudNumber;
-		policyStmt += "$from";
-		policyStmt += relyingPartyCloudNumber;
-		policyStmt += "+registration$do$if$and/$true/({$from}/$is/"
-				+ relyingPartyCloudNumber + ")";
-		setStatements.add(XDI3Statement.create(policyStmt));
-
-		policyStmt = new String();
-		policyStmt += respondingPartyCloudNumber;
-		policyStmt += "$to";
-		policyStmt += relyingPartyCloudNumber;
-		policyStmt += "$from";
-		policyStmt += relyingPartyCloudNumber;
-		policyStmt += "+registration$do$if$and/$true/({$msg}<$sig><$valid>&/&/true)";
-		setStatements.add(XDI3Statement.create(policyStmt));
-
-		String xdiResponseValues = new String();
-
-		for (int i = 0; (selectedValues != null) && (i < selectedValues.length); i++) {
-			String value = selectedValues[i];
-			StringTokenizer st = new StringTokenizer(value, "|");
-			String addressPart = st.nextToken();
-			String valuePart = st.nextToken();
-			xdiResponseValues += addressPart + "/&/" + "\"" + valuePart + "\""
-					+ "\n";
-			// strip the last & off
-			addressPart = addressPart.substring(0, addressPart.length() - 1);
-			String stmt = new String();
-			stmt += respondingPartyCloudNumber;
-			stmt += "$to";
-			stmt += relyingPartyCloudNumber;
-			stmt += "$from";
-			stmt += relyingPartyCloudNumber;
-			stmt += "+registration$do/$get/";
-			stmt += addressPart;
-
-			System.out.println("Set statements :" + stmt);
-			setStatements.add(XDI3Statement.create(stmt));
-		}
-		//System.out.println("All Set statements :" + setStatements);
-		MessageResult setResponse = this.setXDIStmts(setStatements);
-		//System.out.println("Set response : " + setResponse);
-
-		String targetSegment = new String();
-		targetSegment += respondingPartyCloudNumber;
-		targetSegment += "$to";
-		targetSegment += relyingPartyCloudNumber;
-		targetSegment += "$from";
-		targetSegment += relyingPartyCloudNumber;
-		targetSegment += "+registration$do";
-
-		xdiResponseValues += targetSegment + "/$is+/"
-				+ linkContractTemplateAddress + "\n";
-		// send link contract to the relying party
-		// {$from}[@]!:uuid:1+registration$do
-		// String lcAddress = "{$to}" + relyingPartyCloudNumber + "{$from}"
-		// + relyingPartyCloudNumber + "+registration$do";
-		// PersonalCloud relyingPartyPC = PersonalCloud.open(
-		// XDI3Segment.create(relyingPartyCloudNumber),
-		// this.senderCloudNumber, XDI3Segment.create(lcAddress), "");
-		// MessageResult setResponse2 = relyingPartyPC.setXDISegment(XDI3Segment
-		// .create(targetSegment));
-		// System.out.println("Set response 2 : " + setResponse2);
-
-		// get cloudname
-		ArrayList<XDI3Statement> queryStmts = new ArrayList<XDI3Statement>();
-		queryStmts.add(XDI3Statement.create(this.cloudNumber + "/$is$ref/{}"));
-
-		MessageResult cloudNameResp = this.sendQueries(null, queryStmts, false);
-		ContextNode responseRootContext = cloudNameResp.getGraph()
-				.getRootContextNode();
-		if (responseRootContext != null) {
-			Relation requestingPartyCloudnameRel = responseRootContext
-					.getDeepRelation(this.cloudNumber,
-							XDI3Segment.create("$is$ref"));
-			if (requestingPartyCloudnameRel != null) {
-				String requestingPartyCloudNumberCtx = requestingPartyCloudnameRel
-						.getTargetContextNodeXri().toString();
-				xdiResponseValues += this.cloudNumber + "/$is$ref/"
-						+ requestingPartyCloudNumberCtx + "";
-			}
-		}
-		StringBuffer buf = new StringBuffer();
-		buf.append("<html><head></head><div id=\"approval_form\" style=\"position: relative; top: 61px; left: 64px; z-index: 1000;display: block;\">");
-		buf.append("<SCRIPT LANGUAGE=\"JavaScript\">");
-		buf.append("function submitForm() { document.forms['connectResponse'].submit(); }");
-		buf.append("</SCRIPT>");
-		buf.append("<body onload=\"submitForm()\">");
-		// buf.append("<p>Hello <b>" + cloudname + "</b>. Welcome back!");
-		// buf.append("<p>New Link Contracts have been established successfully!");
-		// buf.append("<p>");
-		// for(int i = 0 ; i < selectedValues.length ; i++){
-		// buf.append(selectedValues[i] + "<br>");
-		// }
-		buf.append("<form action=\"" + successurl
-				+ "\" method=\"post\" name=\"connectResponse\">");
-		buf.append("<input type=\"hidden\" name=\"cloudname\" value=\""
-				+ cloudname + "\">");
-		buf.append("</input>");
-		buf.append("<input type=\"hidden\" name=\"relayState\" value=\""
-				+ relayState + "\">");
-		buf.append("</input>");
-		buf.append("<input type=\"hidden\" name=\"cloudnumber\" value=\""
-				+ respondingPartyCloudNumber + "\">");
-		buf.append("</input>");
-		buf.append("<input type=\"hidden\" name=\"endpointuri\" value=\""
-				+ this.cloudEndpointURI + "\">");
-		buf.append("</input>");
-		buf.append("<input type=\"hidden\" name=\"xdiresponse\" value=\'"
-				+ xdiResponseValues + "\'>");
-		buf.append("</input>");
-		buf.append("<input type=\"hidden\" name=\"statuscode\" value=\""
-				+ "@respect.network*connection.manager$success" + "\">");
-		buf.append("</input>");
-		buf.append("<input type=\"submit\" value=\"submit\" style=\"display: none;\" border=\"0\"/>");
-		buf.append("</form>");
-		buf.append("</div>");
-		buf.append("</body>");
-		buf.append("</html>");
-
-		result = buf.toString();
-		System.out.println("Result HTML : \n" + result);
-		return result;
 	}
 
 	public boolean linkContractExists(String connectRequest) {
@@ -3198,256 +2438,6 @@ public class PersonalCloud {
 		return result;
 	}
 
-	public String autoSubmitForm(String cloudname, String connectRequest,
-			String successurl, String relayState) {
-		String result = new String("");
-		System.out.println("\nAuto Submit Form\n");
-		MemoryJSONGraphFactory graphFactory = new MemoryJSONGraphFactory();
-		String templateOwnerInumber = null;
-		String lcTemplateAddress = null;
-		String xdiResponse = new String();
-		try {
-			Graph g = graphFactory.parseGraph(connectRequest);
-			// get remote cloud number
-
-			XDIWriterRegistry.forFormat("XDI DISPLAY", null).write(g,
-					System.out);
-			ContextNode c = g.getRootContextNode();
-			ReadOnlyIterator<ContextNode> allCNodes = c.getAllContextNodes();
-			for (ContextNode ci : allCNodes) {
-				if (ci.containsContextNode(XDI3SubSegment.create("[$msg]"))) {
-					templateOwnerInumber = ci.toString();
-					System.out.println(templateOwnerInumber);
-					break;
-				}
-			}
-			if (templateOwnerInumber == null) {
-				System.out
-						.println("No cloudnumber for requestor/template owner");
-				return result;
-			}
-			// get the address of the link contract template
-			// $set{$do}
-
-			ReadOnlyIterator<Relation> allRelations = c.getAllRelations(); // g.getDeepRelations(XDI3Segment.create(templateOwnerInumber),XDI3Segment.create("$get"));
-			for (Relation r : allRelations) {
-				if (r.getArcXri().toString().equals("$set{$do}")) {
-					lcTemplateAddress = r.getTargetContextNodeXri().toString();
-					System.out.println(r.getTargetContextNodeXri());
-				}
-
-			}
-			if (lcTemplateAddress == null) {
-				System.out.println("No LC template address provided");
-				return result;
-			}
-			// get requested data fields
-
-			ArrayList<XDI3Segment> getDataFields = new ArrayList<XDI3Segment>();
-
-			ReadOnlyIterator<Relation> getRelations = c.getAllRelations();
-			for (Relation r : getRelations) {
-				if (r.getArcXri().toString().equals("$get")) {
-					if (!r.getArcXri().toString().contains("$is$ref")) {
-						if (!r.getTargetContextNodeXri().toString()
-								.contains("/")) {
-							getDataFields.add(r.getTargetContextNodeXri());
-							System.out.println("AutoSubmit : req field : "
-									+ r.getTargetContextNodeXri());
-						}
-					}
-				}
-
-			}
-
-			ArrayList<XDI3Segment> querySegments = new ArrayList<XDI3Segment>();
-			for (XDI3Segment dataField : getDataFields) {
-				String dataFieldStr = dataField.toString();
-				dataFieldStr = dataFieldStr.replace("{$to}",
-						this.cloudNumber.toString());
-
-				querySegments.add(XDI3Segment.create(dataFieldStr));
-			}
-			// get cloudname
-			ArrayList<XDI3Statement> queryStmts = new ArrayList<XDI3Statement>();
-			queryStmts.add(XDI3Statement.create(this.cloudNumber
-					+ "/$is$ref/{}"));
-
-			MessageResult responseFromThisCloud = this.sendQueries(
-					querySegments, queryStmts, false);
-			if (responseFromThisCloud != null) {
-				Graph responseGraph3 = responseFromThisCloud.getGraph();
-				ContextNode responseRootContext3 = responseGraph3
-						.getRootContextNode();
-				ReadOnlyIterator<Literal> allLiteralsFromResponse = responseRootContext3
-						.getAllLiterals();
-
-				for (Literal lit : allLiteralsFromResponse) {
-					xdiResponse += lit.getContextNode().toString() + "/&/"
-							+ "\"" + lit.getLiteralDataString() + "\"\n";
-				}
-				Relation requestingPartyCloudnameRel = responseRootContext3
-						.getDeepRelation(this.cloudNumber,
-								XDI3Segment.create("$is$ref"));
-				if (requestingPartyCloudnameRel != null) {
-					String requestingPartyCloudNumberCtx = requestingPartyCloudnameRel
-							.getTargetContextNodeXri().toString();
-					xdiResponse += this.cloudNumber + "/$is$ref/"
-							+ requestingPartyCloudNumberCtx + "\n";
-				}
-			}
-			String targetSegment = new String();
-			targetSegment += this.cloudNumber;
-			targetSegment += "$to";
-			targetSegment += templateOwnerInumber;
-			targetSegment += "$from";
-			targetSegment += templateOwnerInumber;
-			targetSegment += "+registration$do";
-
-			xdiResponse += targetSegment + "/$is+/" + lcTemplateAddress;
-		} catch (Exception io) {
-			io.printStackTrace();
-			return result;
-		}
-
-		// String linkContractTemplateAddress = new String("{$from}");
-		// linkContractTemplateAddress += templateOwnerInumber;
-		// linkContractTemplateAddress += "+registration$do";
-
-		StringBuffer buf = new StringBuffer();
-		buf.append("<html><head></head><div id=\"approval_form\" style=\"position: relative; top: 61px; left: 64px; z-index: 1000;display: block;\">");
-		buf.append("<SCRIPT LANGUAGE=\"JavaScript\">");
-		buf.append("function submitForm() { document.forms['connectResponse'].submit(); }");
-		buf.append("</SCRIPT>");
-		buf.append("<body onload=\"submitForm()\">");
-		// buf.append("<p>Hello <b>" + cloudname + "</b>. Welcome back!");
-		// buf.append("<p>New Link Contracts have been established successfully!");
-		// buf.append("<p>");
-		// for(int i = 0 ; i < selectedValues.length ; i++){
-		// buf.append(selectedValues[i] + "<br>");
-		// }
-		buf.append("<form action=\"" + successurl
-				+ "\" method=\"post\" name=\"connectResponse\">");
-		buf.append("<input type=\"hidden\" name=\"cloudname\" value=\""
-				+ cloudname + "\">");
-		buf.append("</input>");
-		buf.append("<input type=\"hidden\" name=\"relayState\" value=\""
-				+ relayState + "\">");
-		buf.append("</input>");
-		buf.append("<input type=\"hidden\" name=\"cloudnumber\" value=\""
-				+ this.cloudNumber + "\">");
-		buf.append("</input>");
-		buf.append("<input type=\"hidden\" name=\"endpointuri\" value=\""
-				+ this.cloudEndpointURI + "\">");
-		buf.append("</input>");
-		buf.append("<input type=\"hidden\" name=\"xdiresponse\" value=\'"
-				+ xdiResponse + "\'>");
-		buf.append("</input>");
-		buf.append("<input type=\"hidden\" name=\"statuscode\" value=\""
-				+ "@respect.network*connection.manager$success" + "\">");
-		buf.append("</input>");
-		buf.append("<input type=\"submit\" value=\"submit\" style=\"display: none;\" border=\"0\"/>");
-		buf.append("</form>");
-		buf.append("</div>");
-		buf.append("</body>");
-		buf.append("</html>");
-
-		result = buf.toString();
-		System.out.println("Result HTML : \n" + result);
-		return result;
-
-	}
-
-	public String autoSubmitRejectForm(String cloudname, String connectRequest,
-			String failureurl, String relayState) {
-		String result = new String("");
-
-		MemoryJSONGraphFactory graphFactory = new MemoryJSONGraphFactory();
-		String templateOwnerInumber = null;
-		String lcTemplateAddress = null;
-		try {
-			Graph g = graphFactory.parseGraph(connectRequest);
-			// get remote cloud number
-
-			XDIWriterRegistry.forFormat("XDI DISPLAY", null).write(g,
-					System.out);
-			ContextNode c = g.getRootContextNode();
-			ReadOnlyIterator<ContextNode> allCNodes = c.getAllContextNodes();
-			for (ContextNode ci : allCNodes) {
-				if (ci.containsContextNode(XDI3SubSegment.create("[$msg]"))) {
-					templateOwnerInumber = ci.toString();
-					System.out.println(templateOwnerInumber);
-					break;
-				}
-			}
-			if (templateOwnerInumber == null) {
-				System.out
-						.println("No cloudnumber for requestor/template owner");
-				return result;
-			}
-			// get the address of the link contract template
-			// $set{$do}
-
-			ReadOnlyIterator<Relation> allRelations = c.getAllRelations(); // g.getDeepRelations(XDI3Segment.create(templateOwnerInumber),XDI3Segment.create("$get"));
-			for (Relation r : allRelations) {
-				if (r.getArcXri().toString().equals("$set{$do}")) {
-					lcTemplateAddress = r.getTargetContextNodeXri().toString();
-					System.out.println(r.getTargetContextNodeXri());
-				}
-
-			}
-			if (lcTemplateAddress == null) {
-				System.out.println("No LC template address provided");
-				return result;
-			}
-		} catch (Exception io) {
-			io.printStackTrace();
-			return result;
-		}
-
-		// String linkContractTemplateAddress = new String("{$from}");
-		// linkContractTemplateAddress += templateOwnerInumber;
-		// linkContractTemplateAddress += "+registration$do";
-
-		StringBuffer buf = new StringBuffer();
-		buf.append("<html><head></head><div id=\"rejection_form\" style=\"position: relative; top: 61px; left: 64px; z-index: 1000;display: block;\">");
-		buf.append("<SCRIPT LANGUAGE=\"JavaScript\">");
-		buf.append("function submitForm() { document.forms['connectResponseReject'].submit(); }");
-		buf.append("</SCRIPT>");
-		buf.append("<body onload=\"submitForm()\">");
-		// buf.append("<p>Hello <b>" + cloudname + "</b>. Welcome back!");
-		// buf.append("<p>Link Contract request has been cancelled by the user!");
-		// buf.append("<p>");
-		// for(int i = 0 ; i < selectedValues.length ; i++){
-		// buf.append(selectedValues[i] + "<br>");
-		// }
-		buf.append("<form action=\"" + failureurl
-				+ "\" method=\"post\" name=\"connectResponseReject\">");
-		buf.append("<input type=\"hidden\" name=\"cloudname\" value=\""
-				+ cloudname + "\">");
-		buf.append("</input>");
-		buf.append("<input type=\"hidden\" name=\"relayState\" value=\""
-				+ relayState + "\">");
-		buf.append("</input>");
-		buf.append("<input type=\"hidden\" name=\"cloudnumber\" value=\""
-				+ this.cloudNumber + "\">");
-		buf.append("</input>");
-		buf.append("<input type=\"hidden\" name=\"statuscode\" value=\""
-				+ "@respect.network*connection.manager+user+canceled+request$error"
-				+ "\">");
-		buf.append("</input>");
-		buf.append("<input type=\"submit\" value=\"submit\" style=\"display: none;\" border=\"0\"/>");
-		buf.append("</form>");
-		buf.append("</div>");
-		buf.append("</body>");
-		buf.append("</html>");
-
-		result = buf.toString();
-		System.out.println("Result HTML : \n" + result);
-		return result;
-
-	}
-
 	public String processDisconnectRequest(String requestingParty,
 			String respondingParty) {
 
@@ -3463,6 +2453,298 @@ public class PersonalCloud {
 		System.out.println("Result of delete lc :\n" + result.toString());
 
 		return "<html><body>Deletion of LC was successful!</body></html>";
+	}
+
+	public PublicKey getSignaturePublicKey() {
+		return signaturePublicKey;
+	}
+
+	public void setSignaturePublicKey(PublicKey signaturePublicKey) {
+		this.signaturePublicKey = signaturePublicKey;
+	}
+
+	public XDI3Segment getCloudName() {
+		return cloudName;
+	}
+
+	public void setCloudName(XDI3Segment cloudName) {
+		this.cloudName = cloudName;
+	}
+
+	public XDI3Segment getSenderCloudNumber() {
+		return senderCloudNumber;
+	}
+
+	public void setSenderCloudNumber(XDI3Segment senderCloudNumber) {
+		this.senderCloudNumber = senderCloudNumber;
+	}
+
+	public void setCloudNumber(XDI3Segment cloudNumber) {
+		this.cloudNumber = cloudNumber;
+	}
+
+	public void setCloudEndpointURI(String cloudEndpointURI) {
+		this.cloudEndpointURI = cloudEndpointURI;
+	}
+
+	public Graph signGraph(String XDIGraph, String address) {
+
+		Signature<?, ?> signature = null;
+		Graph graph = null;
+		Key k = null;
+		
+		XDIReader xdiReader = XDIReaderRegistry.getAuto();
+		// parse the graph
+
+		graph = MemoryGraphFactory.getInstance().openGraph();
+
+		try {
+			xdiReader.read(graph, new StringReader(XDIGraph));
+		} catch (Xdi2ParseException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		ContextNode contextNode = graph.getDeepContextNode(XDI3Segment.create(address));
+        if (contextNode == null) throw new RuntimeException("No context node found at address " + address);
+
+		XDI3Segment privKeyAddress = XDI3Segment
+				.create("$msg$sig$keypair<$private><$key>&");
+
+		MessageResult result = getXDIStmts(privKeyAddress, true);
+		MemoryGraph response = (MemoryGraph) result.getGraph();
+		Literal literalValue = response.getDeepLiteral(privKeyAddress);
+		String value = (literalValue == null) ? "" : literalValue
+				.getLiteralData().toString();
+		byte[] key = value.getBytes();
+		signature = Signatures.setSignature(contextNode,
+				PersonalCloud.DEFAULT_DIGEST_ALGORITHM,
+				Integer.parseInt(PersonalCloud.DEFAULT_DIGEST_LENGTH),
+				PersonalCloud.DEFAULT_KEY_ALGORITHM,
+				Integer.parseInt(PersonalCloud.DEFAULT_KEY_LENGTH));
+
+		if (signature instanceof KeyPairSignature) {
+
+			PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(
+					Base64.decodeBase64(key));
+			try {
+				KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+				k = keyFactory.generatePrivate(keySpec);
+
+				((KeyPairSignature) signature).sign((PrivateKey) k);
+				return graph;
+
+			} catch (NoSuchAlgorithmException nalg) {
+				nalg.printStackTrace();
+			} catch (InvalidKeySpecException invKeySpec) {
+				invKeySpec.printStackTrace();
+			} catch (GeneralSecurityException gse) {
+				gse.printStackTrace();
+			}
+		}
+		return graph;
+	}
+
+	public static boolean verifySignature(String XDIGraph, String signedNode,
+			String fromCloudnumber) {
+
+		String output = "";
+		String output2 = "";
+		String stats = "-1";
+		String error = null;
+
+		Properties xdiResultWriterParameters = new Properties();
+
+		xdiResultWriterParameters.setProperty(
+				XDIWriterRegistry.PARAMETER_IMPLIED, "1");
+		xdiResultWriterParameters.setProperty(
+				XDIWriterRegistry.PARAMETER_ORDERED, "1");
+		xdiResultWriterParameters.setProperty(
+				XDIWriterRegistry.PARAMETER_INNER, "1");
+		xdiResultWriterParameters.setProperty(
+				XDIWriterRegistry.PARAMETER_PRETTY, "1");
+
+		XDIReader xdiReader = XDIReaderRegistry.getAuto();
+		XDIWriter xdiResultWriter = XDIWriterRegistry.forFormat("XDI DISPLAY",
+				xdiResultWriterParameters);
+
+		Graph graph = null;
+		Key k = null;
+		Signature<?, ?> signature = null;
+		Boolean valid = null;
+
+		long start = System.currentTimeMillis();
+
+		try {
+
+			// parse the graph
+
+			graph = MemoryGraphFactory.getInstance().openGraph();
+
+			xdiReader.read(graph, new StringReader(XDIGraph));
+
+			// find the context node
+
+			ContextNode contextNode = graph.getDeepContextNode(XDI3Segment
+					.create(signedNode));
+			if (contextNode == null)
+				throw new RuntimeException("No context node found at address "
+						+ signedNode);
+
+			// sign or validate
+
+			// if ("Sign!".equals(submit)) {
+			//
+			// signature = Signatures.setSignature(contextNode, digestAlgorithm,
+			// Integer.parseInt(digestLength), keyAlgorithm,
+			// Integer.parseInt(keyLength));
+			//
+			// if (signature instanceof KeyPairSignature) {
+			//
+			// PKCS8EncodedKeySpec keySpec = new
+			// PKCS8EncodedKeySpec(Base64.decodeBase64(key));
+			// KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+			// k = keyFactory.generatePrivate(keySpec);
+			//
+			// ((KeyPairSignature) signature).sign((PrivateKey) k);
+			// } else if (signature instanceof SymmetricKeySignature) {
+			//
+			// k = new SecretKeySpec(Base64.decodeBase64(key), "AES");
+			//
+			// ((SymmetricKeySignature) signature).sign((SecretKey) k);
+			// }
+			// } else if ("Validate!".equals(submit))
+
+			{
+
+				PersonalCloud fromPC = PersonalCloud.open(
+						XDI3Segment.create(fromCloudnumber), "",
+						XDI3Segment.create("$public$do"), null);
+				XDI3Segment pubKeyAddress = XDI3Segment
+						.create("$msg$sig$keypair<$public><$key>&");
+
+				MessageResult result = fromPC.getXDIStmtsNoSig(pubKeyAddress, true);
+				MemoryGraph response = (MemoryGraph) result.getGraph();
+				Literal literalValue = response.getDeepLiteral(pubKeyAddress);
+				String value = (literalValue == null) ? "" : literalValue
+						.getLiteralData().toString();
+				
+				
+				byte[] key = value.getBytes();
+				signature = Signatures.getSignature(contextNode);
+				if (signature == null)
+					throw new RuntimeException("No signature found at address "
+							+ signedNode);
+
+				if (signature instanceof KeyPairSignature) {
+
+					X509EncodedKeySpec keySpec = new X509EncodedKeySpec(
+							Base64.decodeBase64(key));
+					KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+					k = keyFactory.generatePublic(keySpec);
+
+					valid = Boolean.valueOf(((KeyPairSignature) signature)
+							.validate((PublicKey) k));
+					fromPC.setSignaturePublicKey((PublicKey) k);
+				}
+				// else if (signature instanceof SymmetricKeySignature) {
+				//
+				// k = new SecretKeySpec(Base64.decodeBase64(key), "AES");
+				//
+				// valid = Boolean.valueOf(((SymmetricKeySignature)
+				// signature).validate((SecretKey) k));
+				// }
+			}
+
+			// output the graph or result
+
+			if (valid == null) {
+
+				StringWriter writer = new StringWriter();
+
+				xdiResultWriter.write(graph, writer);
+
+				output = StringEscapeUtils.escapeHtml(writer.getBuffer()
+						.toString());
+			} else {
+
+				output = "Valid: " + valid.toString();
+			}
+		} catch (Exception ex) {
+
+			ex.printStackTrace();
+			error = ex.getMessage();
+			if (error == null)
+				error = ex.getClass().getName();
+		}
+
+		if (signature != null) {
+
+			output2 = Signature.getNormalizedSerialization(signature
+					.getBaseContextNode());
+		}
+
+		long stop = System.currentTimeMillis();
+		if (valid != null) {
+			return valid.booleanValue();
+		} else {
+			return false;
+		}
+
+	}
+
+	public static boolean verifyMessageSignature(Message m) {
+		return PersonalCloud.verifySignature(Signature.getNormalizedSerialization(m.getContextNode()), m.getContextNode()
+				.toString(), m.getSender().toString());
+	}
+	
+	public Message signMessage(Message m){
+		Signature<?, ?> signature = null;
+
+		Key k = null;
+		
+		ContextNode contextNode = m.getContextNode();
+        if (contextNode == null) throw new RuntimeException("No context node found at address " + m.getContextNode());
+
+		XDI3Segment privKeyAddress = XDI3Segment
+				.create("$msg$sig$keypair<$private><$key>&");
+
+		MessageResult result = getXDIStmtsNoSig(privKeyAddress, true);
+		MemoryGraph response = (MemoryGraph) result.getGraph();
+		Literal literalValue = response.getDeepLiteral(privKeyAddress);
+		String value = (literalValue == null) ? "" : literalValue
+				.getLiteralData().toString();
+		byte[] key = value.getBytes();
+		signature = Signatures.setSignature(contextNode,
+				PersonalCloud.DEFAULT_DIGEST_ALGORITHM,
+				Integer.parseInt(PersonalCloud.DEFAULT_DIGEST_LENGTH),
+				PersonalCloud.DEFAULT_KEY_ALGORITHM,
+				Integer.parseInt(PersonalCloud.DEFAULT_KEY_LENGTH));
+
+		if (signature instanceof KeyPairSignature) {
+
+			PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(
+					Base64.decodeBase64(key));
+			try {
+				KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+				k = keyFactory.generatePrivate(keySpec);
+
+				((KeyPairSignature) signature).sign((PrivateKey) k);
+				return m;
+
+			} catch (NoSuchAlgorithmException nalg) {
+				nalg.printStackTrace();
+			} catch (InvalidKeySpecException invKeySpec) {
+				invKeySpec.printStackTrace();
+			} catch (GeneralSecurityException gse) {
+				gse.printStackTrace();
+			}
+		}
+		
+		return m;
 	}
 
 }
