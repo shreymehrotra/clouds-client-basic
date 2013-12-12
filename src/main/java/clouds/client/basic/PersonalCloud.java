@@ -2015,64 +2015,64 @@ public class PersonalCloud {
 	 *            Valid values are "Neustar", "OwnYourInfo"
 	 * @return
 	 */
-	public static PersonalCloud create(String cloudName, String secretToken,
-			String CSPName) {
-		CSP csp = null;
-		if (CSPName.equalsIgnoreCase("Neustar")) {
-			csp = new CSPNeustar();
-		} else if (CSPName.equalsIgnoreCase("OwnYourInfo")) {
-			csp = new CSPOwnYourInfo();
-		}
-
-		if (csp == null) {
-			System.out.println("No valid CSP found for the given CSP name.");
-			return null;
-		}
-
-		PersonalCloud pc = new PersonalCloud();
-		try {
-			// step 1: Check if Cloud Name available
-
-			XDI3Segment cloudNumber = CSPClient.checkCloudNameAvailable(csp,
-					cloudName);
-
-			// step 2: Register Cloud Name
-			if (cloudNumber == null || cloudNumber.toString().length() == 0) {
-
-				XDI3Segment cloudNumberPeerRootXri = CSPClient
-						.registerCloudName(csp, cloudName);
-
-				if (cloudNumberPeerRootXri != null
-						&& cloudNumberPeerRootXri.toString().length() > 0) {
-					// step 3: Register Cloud with Cloud Number and Shared
-					// Secret
-
-					String xdiEndpoint = CSPClient.registerCloud(csp,
-							XDI3Segment.create(cloudName), cloudNumber,
-							cloudNumberPeerRootXri, secretToken);
-
-					if (xdiEndpoint.length() > 0) {
-						// step 4: Register Cloud XDI URL with Cloud Number
-
-						CSPClient.registerCloudXdiUrl(csp,
-								cloudNumberPeerRootXri, xdiEndpoint);
-						pc.cloudNumber = cloudNumber;
-						pc.cloudEndpointURI = xdiEndpoint;
-					}
-				}
-			}
-		} catch (Exception ex) {
-			ex.printStackTrace();
-			return null;
-		}
-
-		pc.linkContractAddress = PersonalCloud.XRI_S_DEFAULT_LINKCONTRACT;
-		pc.secretToken = secretToken;
-		pc.senderCloudNumber = pc.cloudNumber;
-		pc.createDefaultLinkContracts();
-		return pc;
-
-	}
+//	public static PersonalCloud create(String cloudName, String secretToken,
+//			String CSPName) {
+//		CSP csp = null;
+//		if (CSPName.equalsIgnoreCase("Neustar")) {
+//			csp = new CSPNeustar();
+//		} else if (CSPName.equalsIgnoreCase("OwnYourInfo")) {
+//			csp = new CSPOwnYourInfo();
+//		}
+//
+//		if (csp == null) {
+//			System.out.println("No valid CSP found for the given CSP name.");
+//			return null;
+//		}
+//
+//		PersonalCloud pc = new PersonalCloud();
+//		try {
+//			// step 1: Check if Cloud Name available
+//
+//			XDI3Segment cloudNumber = CSPClient.checkCloudNameAvailable(csp,
+//					cloudName);
+//
+//			// step 2: Register Cloud Name
+//			if (cloudNumber == null || cloudNumber.toString().length() == 0) {
+//
+//				XDI3Segment cloudNumberPeerRootXri = CSPClient
+//						.registerCloudName(csp, cloudName);
+//
+//				if (cloudNumberPeerRootXri != null
+//						&& cloudNumberPeerRootXri.toString().length() > 0) {
+//					// step 3: Register Cloud with Cloud Number and Shared
+//					// Secret
+//
+//					String xdiEndpoint = CSPClient.registerCloud(csp,
+//							XDI3Segment.create(cloudName), cloudNumber,
+//							cloudNumberPeerRootXri, secretToken);
+//
+//					if (xdiEndpoint.length() > 0) {
+//						// step 4: Register Cloud XDI URL with Cloud Number
+//
+//						CSPClient.registerCloudXdiUrl(csp,
+//								cloudNumberPeerRootXri, xdiEndpoint);
+//						pc.cloudNumber = cloudNumber;
+//						pc.cloudEndpointURI = xdiEndpoint;
+//					}
+//				}
+//			}
+//		} catch (Exception ex) {
+//			ex.printStackTrace();
+//			return null;
+//		}
+//
+//		pc.linkContractAddress = PersonalCloud.XRI_S_DEFAULT_LINKCONTRACT;
+//		pc.secretToken = secretToken;
+//		pc.senderCloudNumber = pc.cloudNumber;
+//		pc.createDefaultLinkContracts();
+//		return pc;
+//
+//	}
 
 	public String getSessionId() {
 		return sessionId;
