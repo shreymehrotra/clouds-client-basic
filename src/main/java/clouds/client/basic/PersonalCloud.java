@@ -2593,31 +2593,6 @@ public class PersonalCloud {
 			if (contextNode == null)
 				throw new RuntimeException("No context node found at address "
 						+ signedNode);
-
-			// sign or validate
-
-			// if ("Sign!".equals(submit)) {
-			//
-			// signature = Signatures.setSignature(contextNode, digestAlgorithm,
-			// Integer.parseInt(digestLength), keyAlgorithm,
-			// Integer.parseInt(keyLength));
-			//
-			// if (signature instanceof KeyPairSignature) {
-			//
-			// PKCS8EncodedKeySpec keySpec = new
-			// PKCS8EncodedKeySpec(Base64.decodeBase64(key));
-			// KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-			// k = keyFactory.generatePrivate(keySpec);
-			//
-			// ((KeyPairSignature) signature).sign((PrivateKey) k);
-			// } else if (signature instanceof SymmetricKeySignature) {
-			//
-			// k = new SecretKeySpec(Base64.decodeBase64(key), "AES");
-			//
-			// ((SymmetricKeySignature) signature).sign((SecretKey) k);
-			// }
-			// } else if ("Validate!".equals(submit))
-
 			{
 
 				PersonalCloud fromPC = PersonalCloud.open(
@@ -2696,6 +2671,44 @@ public class PersonalCloud {
 
 	}
 
+	public static boolean verifyMessageSignature(String m) {
+		XDIReader xdiReader = XDIReaderRegistry.getAuto();
+		Graph graph = null;
+		graph = MemoryGraphFactory.getInstance().openGraph();
+
+		try {
+			xdiReader.read(graph, new StringReader(m));
+		} catch (Xdi2ParseException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		ContextNode messageContextNode = null;
+		String messageSender = "";
+		ContextNode c = graph.getRootContextNode();
+		ReadOnlyIterator<ContextNode> allCNodes = c.getAllContextNodes();
+		for (ContextNode ci : allCNodes) {
+			if (ci.containsContextNode(XDI3SubSegment.create("[$msg]"))) {
+				messageSender = ci.toString();
+				
+				break;
+			}
+		}
+		ContextNode rootContext = graph.getRootContextNode();
+		ReadOnlyIterator<Relation> allRelations = rootContext.getAllRelations();
+		for(Relation r : allRelations){
+			if(r.getArcXri().toString().equalsIgnoreCase("$is()")){
+				messageContextNode= r.getContextNode();
+				break;
+			}
+		}
+		
+		return PersonalCloud.verifySignature(m,messageContextNode
+				.toString(), messageSender); 
+
+	}
 	public static boolean verifyMessageSignature(Message m) {
 		return PersonalCloud.verifySignature(Signature.getNormalizedSerialization(m.getContextNode()), m.getContextNode()
 				.toString(), m.getSender().toString());

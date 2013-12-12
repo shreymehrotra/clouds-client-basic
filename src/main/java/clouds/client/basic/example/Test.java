@@ -340,6 +340,8 @@ public class Test {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+		
+		PersonalCloud.verifyMessageSignature(respectConnectRequest);
 		String [] checkedValues = new String[1];
 		checkedValues[0] = new String("[=]!:uuid:678ac1a4-4b52-7610-678a-c1a44b527610<+email>&|demo2@newdemoland.com");
 		//pc.processApprovalForm("{$from}[@]!:uuid:e0178407-b7b6-43f9-e017-8407b7b643f9+registration$do", "[@]!:uuid:e0178407-b7b6-43f9-e017-8407b7b643f9", "[=]!:uuid:678ac1a4-4b52-7610-678a-c1a44b527610", "demo2", checkedValues,"http://success","http://failure","=demo2","relayMe") ;
