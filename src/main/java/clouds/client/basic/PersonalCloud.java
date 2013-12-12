@@ -2271,6 +2271,9 @@ public class PersonalCloud {
 			String relyingPartyCloudNumber, String respondingPartyCloudNumber,
 			String secrettoken, String[] selectedValues) {
 		String xdiResponseValues = new String();
+		
+		Graph g1 = MemoryGraphFactory.getInstance().openGraph();
+		
 
 		ArrayList<XDI3Statement> setStatements = new ArrayList<XDI3Statement>();
 		String isPlusstmt = new String();
@@ -2309,7 +2312,8 @@ public class PersonalCloud {
 			String addressPart = st.nextToken();
 			String valuePart = st.nextToken();
 			xdiResponseValues += addressPart + "/&/" + "\"" + valuePart + "\""
-					+ "\n";
+					;
+			g1.setStatement(XDI3Statement.create(addressPart + "/&/" + "\"" + valuePart + "\""));
 			// strip the last & off
 			addressPart = addressPart.substring(0, addressPart.length() - 1);
 			String stmt = new String();
@@ -2337,7 +2341,9 @@ public class PersonalCloud {
 		targetSegment += "+registration$do";
 
 		xdiResponseValues += targetSegment + "/$is+/"
-				+ linkContractTemplateAddress + "\n";
+				+ linkContractTemplateAddress ;
+		g1.setStatement(XDI3Statement.create(targetSegment + "/$is+/"
+				+ linkContractTemplateAddress));
 
 		// send link contract to the relying party
 		// {$from}[@]!:uuid:1+registration$do
@@ -2359,10 +2365,14 @@ public class PersonalCloud {
 						.getTargetContextNodeXri().toString();
 				xdiResponseValues += this.cloudNumber + "/$is$ref/"
 						+ requestingPartyCloudNumberCtx + "";
+				g1.setStatement(XDI3Statement.create(this.cloudNumber + "/$is$ref/"
+						+ requestingPartyCloudNumberCtx + ""));
 			}
 		}
-
-		return xdiResponseValues;
+		
+		Graph g = this.signGraph(Signature.getNormalizedSerialization(g1.getRootContextNode()), respondingPartyCloudNumber);
+		System.out.println("\n\nConnect Response: \n" + g.toString("XDI DISPLAY", null) + "\n\n");
+		return Signature.getNormalizedSerialization(g.getRootContextNode());
 	}
 
 	public boolean linkContractExists(String connectRequest) {
