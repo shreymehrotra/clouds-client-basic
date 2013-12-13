@@ -140,29 +140,36 @@ public class PersonalCloud {
 			pc.setSignaturePublicKey(discoveryResult.getSignaturePublicKey());
 			System.out.println(pc.toString());
 
+			pc.linkContractAddress = linkContractAddress;
+			if (secretToken != null && !secretToken.isEmpty()) {
+				pc.secretToken = secretToken;
+
+				XDI3Segment authorityNodeAddr = XDI3Segment
+						.create(pc.cloudNumber.toString());
+
+				MessageResult result = pc.getXDIStmtsNoSig(authorityNodeAddr,
+						true);
+				MemoryGraph response = (MemoryGraph) result.getGraph();
+				if (response == null
+						|| response.getRootContextNode() == null
+						|| response.getRootContextNode()
+								.getAllContextNodeCount() == 0) {
+					return null;
+				}
+
+			}
+			pc.senderCloudNumber = pc.cloudNumber;
+			pc.sessionId = session;
 		} catch (Xdi2ClientException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 			return null;
 		} catch (Exception ex) {
 			ex.printStackTrace();
+			return null;
 		} finally {
 			httpClient.close();
 		}
-
-		pc.linkContractAddress = linkContractAddress;
-		if (secretToken != null && !secretToken.isEmpty()) {
-			pc.secretToken = secretToken;
-		}
-		pc.senderCloudNumber = pc.cloudNumber;
-		pc.sessionId = session;
-//		if (secretToken != null && !secretToken.isEmpty()
-//				&& pc.getWholeGraph() == null) {
-//			System.out
-//					.println("Could not process getWholeGraph() with the given secret token. Returning null.");
-//			return null;
-//		}
-
 		return pc;
 	}
 
@@ -216,7 +223,7 @@ public class PersonalCloud {
 		PersonalCloud pc = PersonalCloud.open(cloudNameOrCloudNumber, "",
 				linkContractAddress, regURI);
 
-		if(pc != null){
+		if (pc != null) {
 			pc.senderCloudNumber = senderCN;
 		}
 		return pc;
@@ -516,7 +523,7 @@ public class PersonalCloud {
 	public MessageResult setXDIStmts(ArrayList<XDI3Statement> XDIStmts) {
 
 		// prepare XDI client
-		
+
 		XDIClient xdiClient = new XDIHttpClient(cloudEndpointURI);
 
 		// prepare message envelope
@@ -529,11 +536,11 @@ public class PersonalCloud {
 			message.setSecretToken(secretToken);
 		}
 		message.setToPeerRootXri(XdiPeerRoot.createPeerRootArcXri(cloudNumber));
-		
+
 		if (XDIStmts != null && XDIStmts.size() > 0) {
 			message.createSetOperation(XDIStmts.iterator());
 		}
-		
+
 		message = this.signMessage(message);
 		System.out.println();
 		// System.out.println("Message :\n" + messageEnvelope + "\n");
@@ -756,7 +763,8 @@ public class PersonalCloud {
 
 		// prepare message envelope
 
-		MessageEnvelope messageEnvelope = this.buildMessage(query, isDeref, true);
+		MessageEnvelope messageEnvelope = this.buildMessage(query, isDeref,
+				true);
 		MessageResult messageResult = null;
 
 		try {
@@ -779,7 +787,8 @@ public class PersonalCloud {
 		return messageResult;
 	}
 
-	public MessageEnvelope buildMessage (XDI3Segment query, boolean isDeref, boolean withSignature) {
+	public MessageEnvelope buildMessage(XDI3Segment query, boolean isDeref,
+			boolean withSignature) {
 		// prepare message envelope
 
 		MessageEnvelope messageEnvelope = new MessageEnvelope();
@@ -794,7 +803,7 @@ public class PersonalCloud {
 		if (isDeref) {
 			getOp.setParameter(XDI3SubSegment.create("$deref"), "true");
 		}
-		if(withSignature){
+		if (withSignature) {
 			message = this.signMessage(message);
 		}
 		// System.out.println("Message :\n" + messageEnvelope + "\n");
@@ -816,7 +825,8 @@ public class PersonalCloud {
 
 		// prepare message envelope
 
-		MessageEnvelope messageEnvelope = this.buildMessage(query, isDeref, false);
+		MessageEnvelope messageEnvelope = this.buildMessage(query, isDeref,
+				false);
 		MessageResult messageResult = null;
 
 		try {
@@ -838,6 +848,7 @@ public class PersonalCloud {
 		}
 		return messageResult;
 	}
+
 	/*
 	 * contact info
 	 */
@@ -1288,7 +1299,8 @@ public class PersonalCloud {
 		message.setLinkContractXri(XDI3Segment
 				.create("$public[+pendingrequest]$do"));
 
-		message.setToPeerRootXri(XdiPeerRoot.createPeerRootArcXri(peerCloud.getCloudNumber()));
+		message.setToPeerRootXri(XdiPeerRoot.createPeerRootArcXri(peerCloud
+				.getCloudNumber()));
 
 		String reqUUID = "!:uuid:" + UUID.randomUUID().toString();
 
@@ -1555,7 +1567,8 @@ public class PersonalCloud {
 		Message delMessage = delMessageEnvelope.createMessage(cloudNumber, 0);
 		delMessage.setLinkContractXri(linkContractAddress);
 		delMessage.setSecretToken(secretToken);
-		delMessage.setToPeerRootXri(XdiPeerRoot.createPeerRootArcXri(cloudNumber));
+		delMessage.setToPeerRootXri(XdiPeerRoot
+				.createPeerRootArcXri(cloudNumber));
 
 		delMessage.createDelOperation(requestIdXri);
 
@@ -1590,7 +1603,8 @@ public class PersonalCloud {
 		message.setLinkContractXri(XDI3Segment
 				.create("$public[+approvedrequest]$do"));
 
-		message.setToPeerRootXri(XdiPeerRoot.createPeerRootArcXri(peerCloud.getCloudNumber()));
+		message.setToPeerRootXri(XdiPeerRoot.createPeerRootArcXri(peerCloud
+				.getCloudNumber()));
 
 		String reqUUID = requestIdXri.getLastSubSegment().toString();
 
@@ -1658,7 +1672,8 @@ public class PersonalCloud {
 		message.setLinkContractXri(XDI3Segment
 				.create("$public[+pendingrequest]$do"));
 
-		message.setToPeerRootXri(XdiPeerRoot.createPeerRootArcXri(peerCloud.getCloudNumber()));
+		message.setToPeerRootXri(XdiPeerRoot.createPeerRootArcXri(peerCloud
+				.getCloudNumber()));
 
 		message.createDelOperation(XDI3Segment
 				.create("$public[+pendingrequest]" + reqUUID));
@@ -1703,7 +1718,8 @@ public class PersonalCloud {
 		Message delMessage = delMessageEnvelope.createMessage(cloudNumber, 0);
 		delMessage.setLinkContractXri(linkContractAddress);
 		delMessage.setSecretToken(secretToken);
-		delMessage.setToPeerRootXri(XdiPeerRoot.createPeerRootArcXri(cloudNumber));
+		delMessage.setToPeerRootXri(XdiPeerRoot
+				.createPeerRootArcXri(cloudNumber));
 
 		delMessage.createDelOperation(requestIdXri);
 
@@ -1969,7 +1985,8 @@ public class PersonalCloud {
 		Message message = messageEnvelope.createMessage(cloudNumber, 0);
 		message.setLinkContractXri(linkContract);
 
-		message.setToPeerRootXri(XdiPeerRoot.createPeerRootArcXri(peerCloud.getCloudNumber()));
+		message.setToPeerRootXri(XdiPeerRoot.createPeerRootArcXri(peerCloud
+				.getCloudNumber()));
 
 		message.createGetOperation(targetAddress);
 
@@ -2017,64 +2034,64 @@ public class PersonalCloud {
 	 *            Valid values are "Neustar", "OwnYourInfo"
 	 * @return
 	 */
-//	public static PersonalCloud create(String cloudName, String secretToken,
-//			String CSPName) {
-//		CSP csp = null;
-//		if (CSPName.equalsIgnoreCase("Neustar")) {
-//			csp = new CSPNeustar();
-//		} else if (CSPName.equalsIgnoreCase("OwnYourInfo")) {
-//			csp = new CSPOwnYourInfo();
-//		}
-//
-//		if (csp == null) {
-//			System.out.println("No valid CSP found for the given CSP name.");
-//			return null;
-//		}
-//
-//		PersonalCloud pc = new PersonalCloud();
-//		try {
-//			// step 1: Check if Cloud Name available
-//
-//			XDI3Segment cloudNumber = CSPClient.checkCloudNameAvailable(csp,
-//					cloudName);
-//
-//			// step 2: Register Cloud Name
-//			if (cloudNumber == null || cloudNumber.toString().length() == 0) {
-//
-//				XDI3Segment cloudNumberPeerRootXri = CSPClient
-//						.registerCloudName(csp, cloudName);
-//
-//				if (cloudNumberPeerRootXri != null
-//						&& cloudNumberPeerRootXri.toString().length() > 0) {
-//					// step 3: Register Cloud with Cloud Number and Shared
-//					// Secret
-//
-//					String xdiEndpoint = CSPClient.registerCloud(csp,
-//							XDI3Segment.create(cloudName), cloudNumber,
-//							cloudNumberPeerRootXri, secretToken);
-//
-//					if (xdiEndpoint.length() > 0) {
-//						// step 4: Register Cloud XDI URL with Cloud Number
-//
-//						CSPClient.registerCloudXdiUrl(csp,
-//								cloudNumberPeerRootXri, xdiEndpoint);
-//						pc.cloudNumber = cloudNumber;
-//						pc.cloudEndpointURI = xdiEndpoint;
-//					}
-//				}
-//			}
-//		} catch (Exception ex) {
-//			ex.printStackTrace();
-//			return null;
-//		}
-//
-//		pc.linkContractAddress = PersonalCloud.XRI_S_DEFAULT_LINKCONTRACT;
-//		pc.secretToken = secretToken;
-//		pc.senderCloudNumber = pc.cloudNumber;
-//		pc.createDefaultLinkContracts();
-//		return pc;
-//
-//	}
+	// public static PersonalCloud create(String cloudName, String secretToken,
+	// String CSPName) {
+	// CSP csp = null;
+	// if (CSPName.equalsIgnoreCase("Neustar")) {
+	// csp = new CSPNeustar();
+	// } else if (CSPName.equalsIgnoreCase("OwnYourInfo")) {
+	// csp = new CSPOwnYourInfo();
+	// }
+	//
+	// if (csp == null) {
+	// System.out.println("No valid CSP found for the given CSP name.");
+	// return null;
+	// }
+	//
+	// PersonalCloud pc = new PersonalCloud();
+	// try {
+	// // step 1: Check if Cloud Name available
+	//
+	// XDI3Segment cloudNumber = CSPClient.checkCloudNameAvailable(csp,
+	// cloudName);
+	//
+	// // step 2: Register Cloud Name
+	// if (cloudNumber == null || cloudNumber.toString().length() == 0) {
+	//
+	// XDI3Segment cloudNumberPeerRootXri = CSPClient
+	// .registerCloudName(csp, cloudName);
+	//
+	// if (cloudNumberPeerRootXri != null
+	// && cloudNumberPeerRootXri.toString().length() > 0) {
+	// // step 3: Register Cloud with Cloud Number and Shared
+	// // Secret
+	//
+	// String xdiEndpoint = CSPClient.registerCloud(csp,
+	// XDI3Segment.create(cloudName), cloudNumber,
+	// cloudNumberPeerRootXri, secretToken);
+	//
+	// if (xdiEndpoint.length() > 0) {
+	// // step 4: Register Cloud XDI URL with Cloud Number
+	//
+	// CSPClient.registerCloudXdiUrl(csp,
+	// cloudNumberPeerRootXri, xdiEndpoint);
+	// pc.cloudNumber = cloudNumber;
+	// pc.cloudEndpointURI = xdiEndpoint;
+	// }
+	// }
+	// }
+	// } catch (Exception ex) {
+	// ex.printStackTrace();
+	// return null;
+	// }
+	//
+	// pc.linkContractAddress = PersonalCloud.XRI_S_DEFAULT_LINKCONTRACT;
+	// pc.secretToken = secretToken;
+	// pc.senderCloudNumber = pc.cloudNumber;
+	// pc.createDefaultLinkContracts();
+	// return pc;
+	//
+	// }
 
 	public String getSessionId() {
 		return sessionId;
@@ -2245,9 +2262,8 @@ public class PersonalCloud {
 			String relyingPartyCloudNumber, String respondingPartyCloudNumber,
 			String secrettoken, String[] selectedValues) {
 		String xdiResponseValues = new String();
-		
+
 		Graph g1 = MemoryGraphFactory.getInstance().openGraph();
-		
 
 		ArrayList<XDI3Statement> setStatements = new ArrayList<XDI3Statement>();
 		String isPlusstmt = new String();
@@ -2285,9 +2301,9 @@ public class PersonalCloud {
 			StringTokenizer st = new StringTokenizer(value, "|");
 			String addressPart = st.nextToken();
 			String valuePart = st.nextToken();
-			xdiResponseValues += addressPart + "/&/" + "\"" + valuePart + "\""
-					;
-			g1.setStatement(XDI3Statement.create(addressPart + "/&/" + "\"" + valuePart + "\""));
+			xdiResponseValues += addressPart + "/&/" + "\"" + valuePart + "\"";
+			g1.setStatement(XDI3Statement.create(addressPart + "/&/" + "\""
+					+ valuePart + "\""));
 			// strip the last & off
 			addressPart = addressPart.substring(0, addressPart.length() - 1);
 			String stmt = new String();
@@ -2315,7 +2331,7 @@ public class PersonalCloud {
 		targetSegment += "+registration$do";
 
 		xdiResponseValues += targetSegment + "/$is+/"
-				+ linkContractTemplateAddress ;
+				+ linkContractTemplateAddress;
 		g1.setStatement(XDI3Statement.create(targetSegment + "/$is+/"
 				+ linkContractTemplateAddress));
 
@@ -2339,13 +2355,16 @@ public class PersonalCloud {
 						.getTargetContextNodeXri().toString();
 				xdiResponseValues += this.cloudNumber + "/$is$ref/"
 						+ requestingPartyCloudNumberCtx + "";
-				g1.setStatement(XDI3Statement.create(this.cloudNumber + "/$is$ref/"
-						+ requestingPartyCloudNumberCtx + ""));
+				g1.setStatement(XDI3Statement.create(this.cloudNumber
+						+ "/$is$ref/" + requestingPartyCloudNumberCtx + ""));
 			}
 		}
-		
-		Graph g = this.signGraph(Signature.getNormalizedSerialization(g1.getRootContextNode()), respondingPartyCloudNumber);
-		System.out.println("\n\nConnect Response: \n" + g.toString("XDI DISPLAY", null) + "\n\n");
+
+		Graph g = this.signGraph(
+				Signature.getNormalizedSerialization(g1.getRootContextNode()),
+				respondingPartyCloudNumber);
+		System.out.println("\n\nConnect Response: \n"
+				+ g.toString("XDI DISPLAY", null) + "\n\n");
 		return Signature.getNormalizedSerialization(g.getRootContextNode());
 	}
 
@@ -2411,9 +2430,10 @@ public class PersonalCloud {
 		MessageResult responseFromRemoteCloud = this.sendQueries(querySegments,
 				null, false);
 
-		if(responseFromRemoteCloud != null){
+		if (responseFromRemoteCloud != null) {
 			Graph responseGraph = responseFromRemoteCloud.getGraph();
-			ContextNode responseRootContext = responseGraph.getRootContextNode();
+			ContextNode responseRootContext = responseGraph
+					.getRootContextNode();
 			System.out.println("\n\nLink Contract exists check\n\n"
 					+ responseGraph.toString());
 			if (responseRootContext.getContextNodeCount() > 1) {
@@ -2478,7 +2498,7 @@ public class PersonalCloud {
 		Signature<?, ?> signature = null;
 		Graph graph = null;
 		Key k = null;
-		
+
 		XDIReader xdiReader = XDIReaderRegistry.getAuto();
 		// parse the graph
 
@@ -2493,9 +2513,12 @@ public class PersonalCloud {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		
-		ContextNode contextNode = graph.getDeepContextNode(XDI3Segment.create(address));
-        if (contextNode == null) throw new RuntimeException("No context node found at address " + address);
+
+		ContextNode contextNode = graph.getDeepContextNode(XDI3Segment
+				.create(address));
+		if (contextNode == null)
+			throw new RuntimeException("No context node found at address "
+					+ address);
 
 		XDI3Segment privKeyAddress = XDI3Segment
 				.create("$msg$sig$keypair<$private><$key>&");
@@ -2587,13 +2610,13 @@ public class PersonalCloud {
 				XDI3Segment pubKeyAddress = XDI3Segment
 						.create("$msg$sig$keypair<$public><$key>&");
 
-				MessageResult result = fromPC.getXDIStmtsNoSig(pubKeyAddress, true);
+				MessageResult result = fromPC.getXDIStmtsNoSig(pubKeyAddress,
+						true);
 				MemoryGraph response = (MemoryGraph) result.getGraph();
 				Literal literalValue = response.getDeepLiteral(pubKeyAddress);
 				String value = (literalValue == null) ? "" : literalValue
 						.getLiteralData().toString();
-				
-				
+
 				byte[] key = value.getBytes();
 				signature = Signatures.getSignature(contextNode);
 				if (signature == null)
@@ -2678,35 +2701,39 @@ public class PersonalCloud {
 		for (ContextNode ci : allCNodes) {
 			if (ci.containsContextNode(XDI3SubSegment.create("[$msg]"))) {
 				messageSender = ci.toString();
-				
+
 				break;
 			}
 		}
 		ContextNode rootContext = graph.getRootContextNode();
 		ReadOnlyIterator<Relation> allRelations = rootContext.getAllRelations();
-		for(Relation r : allRelations){
-			if(r.getArcXri().toString().equalsIgnoreCase("$is()")){
-				messageContextNode= r.getContextNode();
+		for (Relation r : allRelations) {
+			if (r.getArcXri().toString().equalsIgnoreCase("$is()")) {
+				messageContextNode = r.getContextNode();
 				break;
 			}
 		}
-		
-		return PersonalCloud.verifySignature(m,messageContextNode
-				.toString(), messageSender); 
+
+		return PersonalCloud.verifySignature(m, messageContextNode.toString(),
+				messageSender);
 
 	}
+
 	public static boolean verifyMessageSignature(Message m) {
-		return PersonalCloud.verifySignature(Signature.getNormalizedSerialization(m.getContextNode()), m.getContextNode()
-				.toString(), m.getSender().toString());
+		return PersonalCloud.verifySignature(Signature
+				.getNormalizedSerialization(m.getContextNode()), m
+				.getContextNode().toString(), m.getSender().toString());
 	}
-	
-	public Message signMessage(Message m){
+
+	public Message signMessage(Message m) {
 		Signature<?, ?> signature = null;
 
 		Key k = null;
-		
+
 		ContextNode contextNode = m.getContextNode();
-        if (contextNode == null) throw new RuntimeException("No context node found at address " + m.getContextNode());
+		if (contextNode == null)
+			throw new RuntimeException("No context node found at address "
+					+ m.getContextNode());
 
 		XDI3Segment privKeyAddress = XDI3Segment
 				.create("$msg$sig$keypair<$private><$key>&");
@@ -2742,7 +2769,7 @@ public class PersonalCloud {
 				gse.printStackTrace();
 			}
 		}
-		
+
 		return m;
 	}
 
