@@ -2411,12 +2411,14 @@ public class PersonalCloud {
 		MessageResult responseFromRemoteCloud = this.sendQueries(querySegments,
 				null, false);
 
-		Graph responseGraph = responseFromRemoteCloud.getGraph();
-		ContextNode responseRootContext = responseGraph.getRootContextNode();
-		System.out.println("\n\nLink Contract exists check\n\n"
-				+ responseGraph.toString());
-		if (responseRootContext.getContextNodeCount() > 1) {
-			result = true;
+		if(responseFromRemoteCloud != null){
+			Graph responseGraph = responseFromRemoteCloud.getGraph();
+			ContextNode responseRootContext = responseGraph.getRootContextNode();
+			System.out.println("\n\nLink Contract exists check\n\n"
+					+ responseGraph.toString());
+			if (responseRootContext.getContextNodeCount() > 1) {
+				result = true;
+			}
 		}
 
 		return result;
