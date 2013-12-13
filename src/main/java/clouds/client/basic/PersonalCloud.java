@@ -216,7 +216,9 @@ public class PersonalCloud {
 		PersonalCloud pc = PersonalCloud.open(cloudNameOrCloudNumber, "",
 				linkContractAddress, regURI);
 
-		pc.senderCloudNumber = senderCN;
+		if(pc != null){
+			pc.senderCloudNumber = senderCN;
+		}
 		return pc;
 	}
 
