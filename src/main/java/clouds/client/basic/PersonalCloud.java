@@ -138,9 +138,9 @@ public class PersonalCloud {
 			}
 			pc.cloudEndpointURI = discoveryResult.getXdiEndpointUri();
 			pc.setSignaturePublicKey(discoveryResult.getSignaturePublicKey());
-			System.out.println(pc.toString());
-
 			pc.linkContractAddress = linkContractAddress;
+			pc.senderCloudNumber = pc.cloudNumber;
+			System.out.println(pc.toString());
 			if (secretToken != null && !secretToken.isEmpty()) {
 				pc.secretToken = secretToken;
 
@@ -158,7 +158,7 @@ public class PersonalCloud {
 				}
 
 			}
-			pc.senderCloudNumber = pc.cloudNumber;
+			
 			pc.sessionId = session;
 		} catch (Xdi2ClientException e) {
 			// TODO Auto-generated catch block
@@ -581,59 +581,59 @@ public class PersonalCloud {
 		return messageResult;
 	}
 
-	public MessageResult setXDISegment(XDI3Segment targetSegment) {
-
-		// prepare XDI client
-
-		XDIClient xdiClient = new XDIHttpClient(cloudEndpointURI);
-
-		// prepare message envelope
-
-		MessageEnvelope messageEnvelope = new MessageEnvelope();
-		Message message = messageEnvelope.createMessage(cloudNumber, 0);
-		message.setLinkContractXri(linkContractAddress);
-
-		message.setSecretToken(secretToken);
-
-		message.setToPeerRootXri(XdiPeerRoot.createPeerRootArcXri(cloudNumber));
-		message.createSetOperation(targetSegment);
-
-		// System.out.println("Message :\n" + messageEnvelope + "\n");
-		try {
-			XDIWriterRegistry.forFormat("XDI DISPLAY", null).write(
-					messageEnvelope.getGraph(), System.out);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-
-		// send the message
-
-		MessageResult messageResult = null;
-
-		try {
-
-			messageResult = xdiClient.send(messageEnvelope, null);
-			// System.out.println(messageResult);
-			try {
-				XDIWriterRegistry.forFormat("XDI DISPLAY", null).write(
-						messageResult.getGraph(), System.out);
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-
-		} catch (Xdi2ClientException ex) {
-
-			ex.printStackTrace();
-		} catch (Exception ex) {
-
-			ex.printStackTrace();
-		} finally {
-			xdiClient.close();
-		}
-		return messageResult;
-	}
+//	public MessageResult setXDISegment(XDI3Segment targetSegment) {
+//
+//		// prepare XDI client
+//
+//		XDIClient xdiClient = new XDIHttpClient(cloudEndpointURI);
+//
+//		// prepare message envelope
+//
+//		MessageEnvelope messageEnvelope = new MessageEnvelope();
+//		Message message = messageEnvelope.createMessage(cloudNumber, 0);
+//		message.setLinkContractXri(linkContractAddress);
+//
+//		message.setSecretToken(secretToken);
+//
+//		message.setToPeerRootXri(XdiPeerRoot.createPeerRootArcXri(cloudNumber));
+//		message.createSetOperation(targetSegment);
+//
+//		// System.out.println("Message :\n" + messageEnvelope + "\n");
+//		try {
+//			XDIWriterRegistry.forFormat("XDI DISPLAY", null).write(
+//					messageEnvelope.getGraph(), System.out);
+//		} catch (IOException e) {
+//			// TODO Auto-generated catch block
+//			e.printStackTrace();
+//		}
+//
+//		// send the message
+//
+//		MessageResult messageResult = null;
+//
+//		try {
+//
+//			messageResult = xdiClient.send(messageEnvelope, null);
+//			// System.out.println(messageResult);
+//			try {
+//				XDIWriterRegistry.forFormat("XDI DISPLAY", null).write(
+//						messageResult.getGraph(), System.out);
+//			} catch (IOException e) {
+//				// TODO Auto-generated catch block
+//				e.printStackTrace();
+//			}
+//
+//		} catch (Xdi2ClientException ex) {
+//
+//			ex.printStackTrace();
+//		} catch (Exception ex) {
+//
+//			ex.printStackTrace();
+//		} finally {
+//			xdiClient.close();
+//		}
+//		return messageResult;
+//	}
 
 	public MessageResult delXDIStmts(ArrayList<XDI3Statement> XDIStmts,
 			XDI3Segment target) {
@@ -704,6 +704,7 @@ public class PersonalCloud {
 
 		MessageEnvelope messageEnvelope = new MessageEnvelope();
 		Message message = messageEnvelope.createMessage(senderCloudNumber, 0);
+		
 		message.setLinkContractXri(linkContractAddress);
 		if (secretToken != null) {
 			message.setSecretToken(secretToken);
@@ -733,6 +734,9 @@ public class PersonalCloud {
 			e.printStackTrace();
 		}
 
+		//sign the message
+		message = this.signMessage(message);
+		
 		// send the message
 
 		MessageResult messageResult = null;
@@ -2423,15 +2427,10 @@ public class PersonalCloud {
 		isPlusstmt += templateOwnerInumber;
 		isPlusstmt += "+registration$do";
 
-		ArrayList<XDI3Segment> querySegments = new ArrayList<XDI3Segment>();
+		MessageResult responseFromLocalCloud = this.getXDIStmts(XDI3Segment.create(isPlusstmt), false); 
 
-		querySegments.add(XDI3Segment.create(isPlusstmt));
-
-		MessageResult responseFromRemoteCloud = this.sendQueries(querySegments,
-				null, false);
-
-		if (responseFromRemoteCloud != null) {
-			Graph responseGraph = responseFromRemoteCloud.getGraph();
+		if (responseFromLocalCloud != null) {
+			Graph responseGraph = responseFromLocalCloud.getGraph();
 			ContextNode responseRootContext = responseGraph
 					.getRootContextNode();
 			System.out.println("\n\nLink Contract exists check\n\n"
@@ -2771,6 +2770,48 @@ public class PersonalCloud {
 		}
 
 		return m;
+	}
+	
+	public String saveEmail(PDSEmail email){
+		
+		String id = "";
+		id = "!:uuid:"+UUID.randomUUID().toString();
+		
+		ArrayList <XDI3Statement> setStmts = new ArrayList <XDI3Statement>();
+		
+		String setStmt = "";
+		
+		setStmt += 	this.cloudNumber.toString();
+		setStmt += "[+email]";
+		
+		setStmt += id ;
+		setStmt += "<+date>&/&/\"";
+		setStmt += email.getArrivalTime().toString();
+		setStmt += "\"";
+		
+		setStmts.add(XDI3Statement.create(setStmt));
+
+		setStmt = "";	
+		setStmt += 	this.cloudNumber.toString();
+		setStmt += "[+email]";
+		setStmt += id ;
+		setStmt += "<+sender>&/&/\"";
+		setStmt += email.getFrom();
+		setStmt += "\"";
+		setStmts.add(XDI3Statement.create(setStmt));
+
+		setStmt = "";	
+		setStmt += 	this.cloudNumber.toString();
+		setStmt += "[+email]";
+		setStmt += id ;
+		setStmt += "<+subject>&/&/\"";
+		setStmt += email.getContent();
+		setStmt += "\"";
+		setStmts.add(XDI3Statement.create(setStmt));
+
+		MessageResult result = this.setXDIStmts(setStmts);
+		System.out.println("\n Save mail:\n" + result.toString() + "\n");
+		return id;
 	}
 
 }

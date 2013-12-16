@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.StringWriter;
 import java.util.ArrayList;
+import java.util.Date;
 
 import xdi2.core.Graph;
 import xdi2.core.constants.XDIConstants;
@@ -20,6 +21,7 @@ import xdi2.core.xri3.XDI3Segment;
 import clouds.client.basic.ContactInfo;
 import clouds.client.basic.PCAttribute;
 import clouds.client.basic.PCAttributeCollection;
+import clouds.client.basic.PDSEmail;
 import clouds.client.basic.PDSXElement;
 import clouds.client.basic.PDSXElementTemplate;
 import clouds.client.basic.PDSXEntity;
@@ -295,9 +297,19 @@ public class Test {
 //		
 //		pc_animesh2.approveAccess(XDI3Segment.create(reqURI),null);
 		//PersonalCloud pc = PersonalCloud.open(XDI3Segment.create("=demo2"), "demo2", PersonalCloud.XRI_S_DEFAULT_LINKCONTRACT, "","");
-		PersonalCloud.DEFAULT_REGISTRY_URI = "http://mycloud-ote.neustar.biz:12220/";
+		PersonalCloud.DEFAULT_REGISTRY_URI = "http://mycloud.neustar.biz:12220/";
 		
 		PersonalCloud pc = PersonalCloud.open(XDI3Segment.create("=alice"),"alice",XDI3Segment.create("$do"),"");
+		PDSEmail email = new PDSEmail();
+		email.setFrom("animesh.chowdhury@neustar.biz");
+		email.setArrivalTime(new Date());
+		email.setContent("This is a test email");
+		email.setSubject("Test Mail");
+		
+		pc.saveEmail(email);
+		pc.getWholeGraph();
+		
+		
 		//pc.getDataBucket("work");
 		String str = "";
 		if(pc == null){
