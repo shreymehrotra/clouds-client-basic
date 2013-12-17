@@ -301,12 +301,12 @@ public class Test {
 		
 		PersonalCloud pc = PersonalCloud.open(XDI3Segment.create("=alice"),"alice",XDI3Segment.create("$do"),"");
 		PDSEmail email = new PDSEmail();
-		email.setFrom("animesh.chowdhury@neustar.biz");
+		email.setFrom("animesh.chowdhury@gmail.com");
 		email.setArrivalTime(new Date());
-		email.setContent("This is a test email");
-		email.setSubject("Test Mail");
+		email.setContent("This is another test email");
+		email.setSubject("Test Mail2");
 		
-		pc.saveEmail(email);
+		pc.saveEmail(email,null);
 		pc.getWholeGraph();
 		
 		

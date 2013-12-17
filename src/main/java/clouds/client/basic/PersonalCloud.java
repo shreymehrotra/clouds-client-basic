@@ -2771,43 +2771,92 @@ public class PersonalCloud {
 
 		return m;
 	}
-	
-	public String saveEmail(PDSEmail email){
+	/*
+	 * Saves Email in the Personal Cloud
+	 * @email : The mail object
+	 * @mailId : The unique identifier for the mail object. Used for update.
+	 * @return : Unique Id for the mail object for new mails
+	 */
+	public String saveEmail(PDSEmail email , String mailId){
 		
 		String id = "";
-		id = "!:uuid:"+UUID.randomUUID().toString();
+		if(mailId == null){
+			id = "!:uuid:"+UUID.randomUUID().toString();
+		} else {
+			id = mailId;
+		}
 		
 		ArrayList <XDI3Statement> setStmts = new ArrayList <XDI3Statement>();
 		
 		String setStmt = "";
 		
-		setStmt += 	this.cloudNumber.toString();
-		setStmt += "[+email]";
+		if(mailId == null){
+			setStmt += 	this.cloudNumber.toString();
+			setStmt += "[+email]";
+			
+			setStmt += id ;
+			setStmt += "<+date>&/&/\"";
+			setStmt += email.getArrivalTime().toString();
+			setStmt += "\"";
+			
+			setStmts.add(XDI3Statement.create(setStmt));
 		
-		setStmt += id ;
-		setStmt += "<+date>&/&/\"";
-		setStmt += email.getArrivalTime().toString();
-		setStmt += "\"";
-		
-		setStmts.add(XDI3Statement.create(setStmt));
-
+			setStmt = "";	
+			setStmt += 	this.cloudNumber.toString();
+			setStmt += "[+email]";
+			setStmt += id ;
+			setStmt += "<+sender>&/&/\"";
+			setStmt += email.getFrom();
+			setStmt += "\"";
+			setStmts.add(XDI3Statement.create(setStmt));
+	
+			setStmt = "";	
+			setStmt += 	this.cloudNumber.toString();
+			setStmt += "[+email]";
+			setStmt += id ;
+			setStmt += "<+subject>&/&/\"";
+			setStmt += email.getContent();
+			setStmt += "\"";
+			setStmts.add(XDI3Statement.create(setStmt));
+		}
 		setStmt = "";	
 		setStmt += 	this.cloudNumber.toString();
 		setStmt += "[+email]";
 		setStmt += id ;
-		setStmt += "<+sender>&/&/\"";
-		setStmt += email.getFrom();
-		setStmt += "\"";
+		setStmt += "<+priority>&/&/";
+		setStmt += email.getPriority();
+		
 		setStmts.add(XDI3Statement.create(setStmt));
-
+		
 		setStmt = "";	
 		setStmt += 	this.cloudNumber.toString();
 		setStmt += "[+email]";
 		setStmt += id ;
-		setStmt += "<+subject>&/&/\"";
-		setStmt += email.getContent();
-		setStmt += "\"";
+		setStmt += "<+flag>&/&/";
+		setStmt += email.getFlag();
+		
 		setStmts.add(XDI3Statement.create(setStmt));
+		
+		for(Microtag tag : email.getTagList()){
+
+			setStmt = "";	
+			setStmt += 	this.cloudNumber.toString();
+			setStmt += "[+email]";
+			setStmt += id ;
+			setStmt += "[<+tag>]";
+			String tagId = "!:uuid:"+UUID.randomUUID().toString();
+			setStmt += tagId;
+			if(tag.getName() != null){
+				setStmt += "<+name>&/&/\"" + tag.getName() + "\"";
+			}
+			if (tag.getValue() != null){
+				setStmt += "<+value>&/&/\"" + tag.getValue() + "\"";
+			}
+			if(tag.getCategory() != null){
+				setStmt += "<+category>&/&/\"" + tag.getCategory() + "\"";
+			}
+			setStmts.add(XDI3Statement.create(setStmt));
+		}
 
 		MessageResult result = this.setXDIStmts(setStmts);
 		System.out.println("\n Save mail:\n" + result.toString() + "\n");

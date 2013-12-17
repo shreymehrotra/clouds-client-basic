@@ -11,7 +11,21 @@ public class PDSEmail {
 	private Date arrivalTime;
 	private String content;
 	private Vector<Microtag> tagList = new Vector<Microtag>();
+	private int priority = 0;
+	private int flag = 0;
 	
+	public int getFlag() {
+		return flag;
+	}
+	public void setFlag(int flag) {
+		this.flag = flag;
+	}
+	public int getPriority() {
+		return priority;
+	}
+	public void setPriority(int priority) {
+		this.priority = priority;
+	}
 	public String getFrom() {
 		return from;
 	}
